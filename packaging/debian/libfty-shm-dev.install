@@ -1,0 +1,3 @@
+usr/include/*
+usr/lib/*/libfty_shm.so
+usr/lib/*/pkgconfig/libfty_shm.pc
