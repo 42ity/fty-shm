@@ -132,7 +132,7 @@ static int read_value(const char *filename, char **value)
     if (fstat(fd, &st) < 0)
         goto out;
     if (st.st_size < TTL_LEN) {
-        errno = -EIO;
+        errno = EIO;
         goto out;
     }
     if (read_buf(fd, ttl_str, TTL_LEN) < 0)
@@ -141,12 +141,12 @@ static int read_value(const char *filename, char **value)
     ttl_str[TTL_LEN - 1] = '\0';
     ttl = strtol(ttl_str, &err, 10);
     if (err != ttl_str + TTL_LEN - 1) {
-        errno = -ERANGE;
+        errno = ERANGE;
         goto out;
     }
     now = time(NULL);
     if (now - st.st_mtime > ttl) {
-        errno = -ESTALE;
+        errno = ESTALE;
         goto out;
     }
     size = st.st_size - TTL_LEN;
