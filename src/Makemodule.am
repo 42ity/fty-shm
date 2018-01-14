@@ -18,15 +18,16 @@ include_HEADERS = \
     include/fty_shm_library.h
 
 src_libfty_shm_la_SOURCES = \
-    src/fty_shm.c \
+    src/fty_shm.cc \
     src/platform.h
 
 if ENABLE_DRAFTS
 src_libfty_shm_la_SOURCES += \
-    src/fty_shm_private_selftest.c
+    src/fty_shm_private_selftest.cc
 endif
 
 src_libfty_shm_la_CPPFLAGS = ${AM_CPPFLAGS}
+src_libfty_shm_la_CXXFLAGS = ${AM_CXXFLAGS}
 
 src_libfty_shm_la_LDFLAGS = \
     -version-info @LTVER@ \
@@ -51,7 +52,7 @@ check_PROGRAMS += src/fty_shm_selftest
 noinst_PROGRAMS += src/fty_shm_selftest
 src_fty_shm_selftest_CPPFLAGS = ${AM_CPPFLAGS}
 src_fty_shm_selftest_LDADD = ${program_libs}
-src_fty_shm_selftest_SOURCES = src/fty_shm_selftest.c
+src_fty_shm_selftest_SOURCES = src/fty_shm_selftest.cc
 endif #ENABLE_FTY_SHM_SELFTEST
 
 # define custom target for all products of /src
@@ -188,7 +189,7 @@ coverage: src/fty_shm_selftest $(top_builddir)/$(SELFTEST_DIR_RW) $(top_builddir
 	$(MAKE) check
 	lcov --base-directory . --directory . --capture -o coverage.info
 	lcov --remove coverage.info "/usr*" -o coverage.info
-	lcov --remove coverage.info "fty_shm_selftest.c" -o coverage.info
+	lcov --remove coverage.info "fty_shm_selftest.cc" -o coverage.info
 	$(RM) -rf coverage/*
 	genhtml -o coverage/ -t "fty-shm test coverage" --num-spaces 4 coverage.info
 else

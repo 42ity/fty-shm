@@ -65,7 +65,7 @@ GENERATED_DOCS =
 	@true
 
 GENERATED_DOCS += fty_shm.txt fty_shm.doc
-fty_shm.txt: $(top_srcdir)/src/fty_shm.c
+fty_shm.txt: $(top_srcdir)/src/fty_shm.cc
 	"$(srcdir)/mkman" "fty_shm" "$(builddir)/fty_shm.txt" "$(srcdir)/.."
 
 

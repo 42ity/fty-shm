@@ -40,7 +40,7 @@
 #define TTL_LEN 11
 
 // This is only changed by the selftest code
-static char *shm_dir = DEFAULT_SHM_DIR;
+static const char *shm_dir = DEFAULT_SHM_DIR;
 
 static int validate_names(const char *asset, const char *metric)
 {

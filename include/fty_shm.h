@@ -25,6 +25,10 @@
 //  Include the project library file
 #include "fty_shm_library.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Stores a single metric in shm. The metric name must be a valid filename
 // (must not contain slashes and must fit within the OS limit for filename
 // length). TTL is the number of seconds for which this metric is valid,
@@ -39,4 +43,8 @@ int fty_shm_read_metric(const char *asset, const char *metric, char **value);
 
 void fty_shm_test (bool verbose);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif // FTY_SHM_H_H_INCLUDED

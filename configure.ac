@@ -49,6 +49,8 @@ FTY_SHM_ORIG_CFLAGS="${CFLAGS:-none}"
 AC_PROG_CC
 AC_PROG_CC_C99
 AM_PROG_CC_C_O
+AC_PROG_CXX
+AC_PROG_CXX_C_O
 AC_LIBTOOL_WIN32_DLL
 AC_PROG_LIBTOOL
 AC_PROG_SED
@@ -465,7 +467,7 @@ AC_C_BIGENDIAN
 
 # These options are GNU compiler specific.
 if test "x$GCC" = "xyes"; then
-    CPPFLAGS="-pedantic -Werror -Wall -Wc++-compat ${CPPFLAGS}"
+    CPPFLAGS="-pedantic -Werror -Wall ${CPPFLAGS}"
 fi
 
 AM_CONDITIONAL(ENABLE_SHARED, test "x$enable_shared" = "xyes")

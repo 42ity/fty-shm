@@ -8,10 +8,14 @@ ACLOCAL_AMFLAGS = -I config
 AM_CFLAGS = \
     -Werror=format-security
 
+AM_CXXFLAGS = \
+    -Werror=format-security \
+    -std=c++11
 
 AM_CPPFLAGS = \
     ${libzmq_CFLAGS} \
     ${czmq_CFLAGS} \
+    -D__STDC_FORMAT_MACROS \
     -I$(srcdir)/include
 
 project_libs = ${libzmq_LIBS} ${czmq_LIBS}
