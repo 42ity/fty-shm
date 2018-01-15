@@ -46,14 +46,14 @@
 // This is only changed by the selftest code
 static const char *shm_dir = DEFAULT_SHM_DIR;
 
-static int validate_names(const char *asset, const char *metric)
+static int validate_names(const std::string &asset, const std::string &metric)
 {
-    if (strlen(asset) + strlen(":") + strlen(metric) + SUFFIX_LEN > NAME_MAX) {
+    if (asset.length() + strlen(":") + metric.length() + SUFFIX_LEN > NAME_MAX) {
         errno = ENAMETOOLONG;
         return -1;
     }
-    if (strchr(asset,  '/') || strchr(asset,  ':') ||
-        strchr(metric, '/') || strchr(metric, ':')) {
+    if (asset.find_first_of("/:", 0, 2) != asset.npos ||
+            metric.find_first_of("/:", 0, 2) != metric.npos) {
         errno = EINVAL;
         return -1;
     }
@@ -92,6 +92,11 @@ static ssize_t read_buf(int fd, char *buf, size_t len)
     return done;
 }
 
+static ssize_t read_buf(int fd, std::string &buf, size_t len)
+{
+    return read_buf(fd, &buf.front(), len);
+}
+
 // Write ttl and value to filename.tmp and atomically replace filename
 static int write_value(const char *filename, const char *value, int ttl)
 {
@@ -121,13 +126,41 @@ out_unlink:
     return -1;
 }
 
+bool alloc_str(char * &str, size_t len)
+{
+    char *tmp = (char *)malloc(len + 1);
+    if (!tmp)
+        return false;
+    str = tmp;
+    return true;
+}
+
+bool alloc_str(std::string &str, size_t len)
+{
+    str.resize(len);
+    return true;
+}
+
+void free_str(char * &str)
+{
+    free(str);
+    str = NULL;
+}
+
+void free_str(std::string &str)
+{
+    // NO-OP
+}
+
 // XXX: The error codes are somewhat arbitrary
-static int read_value(const char *filename, char **value)
+template<typename T>
+static int read_value(const char *filename, T &value)
 {
     int fd;
     struct stat st;
     size_t size;
-    char ttl_str[TTL_LEN], *buf, *err;
+    char ttl_str[TTL_LEN], *err;
+    T buf;
     time_t now, ttl;
     int ret = -1;
 
@@ -154,14 +187,14 @@ static int read_value(const char *filename, char **value)
         goto out;
     }
     size = st.st_size - TTL_LEN;
-    if (!(buf = (char *)malloc(size + 1)))
+    if (!alloc_str(buf, size))
         goto out;
     buf[size] = '\0';
     if (read_buf(fd, buf, size) < 0) {
-        free(buf);
+        free_str(buf);
         goto out;
     }
-    *value = buf;
+    value = buf;
     ret = 0;
 out:
     close(fd);
@@ -185,6 +218,16 @@ int fty_shm_read_metric(const char *asset, const char *metric, char **value)
     if (validate_names(asset, metric) < 0)
         return -1;
     sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset, metric);
+    return read_value(filename, *value);
+}
+
+int fty::shm::read_metric(const std::string &asset, const std::string &metric, std::string &value)
+{
+    char filename[PATH_BUF_SIZE];
+
+    if (validate_names(asset, metric) < 0)
+        return -1;
+    sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset.c_str(), metric.c_str());
     return read_value(filename, value);
 }
 
@@ -229,6 +272,7 @@ void
 fty_shm_test (bool verbose)
 {
     char *value = NULL;
+    std::string string;
     const char *asset1 = "test_asset_1", *asset2 = "test_asset_2";
     const char *metric1 = "test_metric_1", *metric2 = "test_metric_2";
     const char *value1 = "hello world", *value2 = "This is\na metric";
@@ -274,12 +318,10 @@ fty_shm_test (bool verbose)
     assert(streq(value, value1));
     zstr_free(&value);
 
-    // Update a metric
-    check_err(fty_shm_write_metric(asset1, metric1, value2, 0));
-    check_err(fty_shm_read_metric (asset1, metric1, &value));
-    assert(value);
-    assert(streq(value, value2));
-    zstr_free(&value);
+    // Update a metric (C++)
+    check_err(fty::shm::write_metric(asset1, metric1, value2, 0));
+    check_err(fty::shm::read_metric (asset1, metric1, string));
+    assert(string == value2);
 
     // List assets
     check_err(fty_shm_write_metric(asset1, metric2, value1, 0));

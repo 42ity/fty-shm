@@ -63,6 +63,15 @@ namespace shm {
 typedef std::vector<std::string> Assets;
 typedef std::unordered_map<std::string, std::string> AssetMetrics;
 
+// C++ wrapper for fty_shm_write_metric()
+inline int write_metric(const std::string &asset, const std::string &metric, const std::string &value, int ttl)
+{
+    return fty_shm_write_metric(asset.c_str(), metric.c_str(), value.c_str(), ttl);
+}
+
+// C++ version of fty_shm_read_metric()
+int read_metric(const std::string &asset, const std::string &metric, std::string &value);
+
 // Fill the passed vector with assets known to the storage. Note that for
 // optimization purposes, the result can also include assets with expired
 // metrics. If there are no assets in the storage but the storage is
