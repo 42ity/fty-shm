@@ -1,6 +1,6 @@
 <project
     name = "fty-shm"
-    description = "Metric sharing library for 42ity"
+    description = "Lockless metric sharing library for 42ity"
     script = "zproject.gsl"
     email = "EatonIPCOpenSource@eaton.com"
     url = "https://42ity.org"

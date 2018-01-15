@@ -1,5 +1,5 @@
 #
-#    fty-shm - Metric sharing library for 42ity
+#    fty-shm - Lockless metric sharing library for 42ity
 #
 #    Copyright (C) 2018 Eaton
 #
@@ -34,7 +34,7 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: fty-shm shared library
  This package contains shared library for fty-shm:
- metric sharing library for 42ity
+ lockless metric sharing library for 42ity
 
 Package: libfty-shm-dev
 Architecture: any
@@ -46,7 +46,7 @@ Depends:
     libfty-shm0 (= ${binary:Version})
 Description: fty-shm development tools
  This package contains development files for fty-shm:
- metric sharing library for 42ity
+ lockless metric sharing library for 42ity
 
 
 Package: fty-shm-dbg
@@ -58,4 +58,4 @@ Depends:
     ${misc:Depends}
 Description: fty-shm debugging symbols
  This package contains the debugging symbols for fty-shm:
- metric sharing library for 42ity.
+ lockless metric sharing library for 42ity.

@@ -1,5 +1,5 @@
 #
-#    fty-shm - Metric sharing library for 42ity
+#    fty-shm - Lockless metric sharing library for 42ity
 #
 #    Copyright (C) 2018 Eaton
 #
@@ -31,7 +31,7 @@
 Name:           fty-shm
 Version:        1.0.0
 Release:        1
-Summary:        metric sharing library for 42ity
+Summary:        lockless metric sharing library for 42ity
 License:        GPL-2.0+
 URL:            https://42ity.org
 Source0:        %{name}-%{version}.tar.gz
@@ -52,14 +52,14 @@ BuildRequires:  czmq-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
-fty-shm metric sharing library for 42ity.
+fty-shm lockless metric sharing library for 42ity.
 
 %package -n libfty_shm0
 Group:          System/Libraries
-Summary:        metric sharing library for 42ity shared library
+Summary:        lockless metric sharing library for 42ity shared library
 
 %description -n libfty_shm0
-This package contains shared library for fty-shm: metric sharing library for 42ity
+This package contains shared library for fty-shm: lockless metric sharing library for 42ity
 
 %post -n libfty_shm0 -p /sbin/ldconfig
 %postun -n libfty_shm0 -p /sbin/ldconfig
@@ -69,15 +69,15 @@ This package contains shared library for fty-shm: metric sharing library for 42i
 %{_libdir}/libfty_shm.so.*
 
 %package devel
-Summary:        metric sharing library for 42ity
+Summary:        lockless metric sharing library for 42ity
 Group:          System/Libraries
 Requires:       libfty_shm0 = %{version}
 Requires:       zeromq-devel
 Requires:       czmq-devel
 
 %description devel
-metric sharing library for 42ity development tools
-This package contains development files for fty-shm: metric sharing library for 42ity
+lockless metric sharing library for 42ity development tools
+This package contains development files for fty-shm: lockless metric sharing library for 42ity
 
 %files devel
 %defattr(-,root,root)
