@@ -29,6 +29,9 @@
 extern "C" {
 #endif
 
+// This is the basic C API of the library. It allows to store and retrieve
+// individual metrics.
+
 // Stores a single metric in shm. The metric name must be a valid filename
 // (must not contain slashes and must fit within the OS limit for filename
 // length). TTL is the number of seconds for which this metric is valid,
@@ -45,6 +48,32 @@ void fty_shm_test (bool verbose);
 
 #ifdef __cplusplus
 }
-#endif
+// More fancy stuff is possible with the C++ API. It is arguably not the
+// cleanest API on the planet -- it signals errors via a return code and
+// requires the caller to provide a container for the results instead of
+// relying on RVO -- but it should be good enough for now.
+
+#include <string>
+#include <vector>
+#include <unordered_map>
+
+namespace fty {
+namespace shm {
+
+typedef std::vector<std::string> Assets;
+typedef std::unordered_map<std::string, std::string> AssetMetrics;
+
+// Fill the passed vector with assets known to the storage. Note that for
+// optimization purposes, the result can also include assets with expired
+// metrics. If there are no assets in the storage but the storage is
+// accessible, returns an empty list.
+// Returns 0 on success. On error, returns -1 sets errno accordingly and leaves
+// the vector intact
+int find_assets(Assets &assets);
+
+}
+}
+
+#endif // __cplusplus
 
 #endif // FTY_SHM_H_H_INCLUDED

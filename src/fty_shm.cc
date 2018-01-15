@@ -26,6 +26,10 @@
 @end
 */
 
+#include <unordered_set>
+#include <algorithm>
+#include <dirent.h>
+
 #include "fty_shm_classes.h"
 
 #define DEFAULT_SHM_DIR       "/var/run/fty-shm-1"
@@ -184,6 +188,31 @@ int fty_shm_read_metric(const char *asset, const char *metric, char **value)
     return read_value(filename, value);
 }
 
+int fty::shm::find_assets(Assets &assets)
+{
+    DIR *dir;
+    struct dirent *de;
+    std::unordered_set<std::string> seen;
+
+    if (!(dir = opendir(shm_dir)))
+        return -1;
+
+    // TODO: Remember the number of items from last time and reserve it
+    assets.clear();
+    while ((de = readdir(dir))) {
+        char *delim = strchr(de->d_name, ':');
+        if (!delim)
+            // Malformed filename
+            continue;
+        *delim = '\0';
+        if (!seen.insert(de->d_name).second)
+            continue;
+        assets.push_back(de->d_name);
+    }
+    closedir(dir);
+    return 0;
+}
+
 //  --------------------------------------------------------------------------
 //  Self test of this class
 
@@ -201,7 +230,7 @@ fty_shm_test (bool verbose)
 {
     char *value = NULL;
     const char *asset1 = "test_asset_1", *asset2 = "test_asset_2";
-    const char *metric1 = "test_metric_1";
+    const char *metric1 = "test_metric_1", *metric2 = "test_metric_2";
     const char *value1 = "hello world", *value2 = "This is\na metric";
 
     printf (" * fty_shm: ");
@@ -230,6 +259,13 @@ fty_shm_test (bool verbose)
     shm_dir = "src/selftest-rw";
     assert(strlen(shm_dir) <= strlen(DEFAULT_SHM_DIR));
     check_err(access(shm_dir, X_OK | W_OK));
+    // The buildsystem does not delete this for some reason
+    system("rm -f src/selftest-rw/*");
+
+    // Check that the storage is empty
+    fty::shm::Assets assets;
+    fty::shm::find_assets(assets);
+    assert(assets.size() == 0);
 
     // Write and read back a metric
     check_err(fty_shm_write_metric(asset1, metric1, value1, 0));
@@ -244,6 +280,15 @@ fty_shm_test (bool verbose)
     assert(value);
     assert(streq(value, value2));
     zstr_free(&value);
+
+    // List assets
+    check_err(fty_shm_write_metric(asset1, metric2, value1, 0));
+    check_err(fty_shm_write_metric(asset2, metric1, value1, 0));
+    fty::shm::find_assets(assets);
+    assert(assets.size() == 2);
+    assert(std::find(assets.begin(), assets.end(), asset1) != assets.end());
+    assert(std::find(assets.begin(), assets.end(), asset2) != assets.end());
+
 
     // TTL OK
     check_err(fty_shm_write_metric(asset2, metric1, value2, INT_MAX));
