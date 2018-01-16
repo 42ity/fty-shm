@@ -221,6 +221,33 @@ int fty_shm_read_metric(const char *asset, const char *metric, char **value)
     return read_value(filename, *value);
 }
 
+int fty_shm_delete_asset(const char *asset)
+{
+    DIR *dir;
+    struct dirent *de;
+    int err = 0;
+
+    if (!(dir = opendir(shm_dir)))
+        return -1;
+
+    while ((de = readdir(dir))) {
+        const char *delim = strchr(de->d_name, ':');
+        if (!delim)
+            // Malformed filename
+            continue;
+        size_t asset_len = delim - de->d_name;
+	if (std::string(de->d_name, asset_len) != asset)
+            continue;
+        char filename[PATH_BUF_SIZE];
+        sprintf(filename, "%s/%s", shm_dir, de->d_name);
+        if (unlink(filename) < 0)
+            err = -1;
+    }
+    closedir(dir);
+    return err;
+
+}
+
 int fty::shm::read_metric(const std::string &asset, const std::string &metric, std::string &value)
 {
     char filename[PATH_BUF_SIZE];
@@ -372,6 +399,12 @@ fty_shm_test (bool verbose)
     assert(metrics.size() == 2);
     assert(metrics[metric1] == value2);
     assert(metrics[metric2] == value1);
+
+    // Delete asset1 and check that asset2 remains
+    check_err(fty::shm::delete_asset(asset1));
+    assert(fty::shm::read_asset_metrics(asset1, metrics) < 0);
+    check_err(fty::shm::read_asset_metrics(asset2, metrics));
+    assert(metrics.size() == 1);
 
     // TTL OK
     check_err(fty_shm_write_metric(asset2, metric1, value2, INT_MAX));

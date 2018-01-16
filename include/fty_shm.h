@@ -43,6 +43,9 @@ int fty_shm_write_metric(const char *asset, const char *metric, const char *valu
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
 int fty_shm_read_metric(const char *asset, const char *metric, char **value);
 
+// Delete all metrics associated with this asset from shm
+int fty_shm_delete_asset(const char *asset);
+
 
 void fty_shm_test (bool verbose);
 
@@ -71,6 +74,12 @@ inline int write_metric(const std::string &asset, const std::string &metric, con
 
 // C++ version of fty_shm_read_metric()
 int read_metric(const std::string &asset, const std::string &metric, std::string &value);
+
+// C++ wrapper for fty_shm_delete_asset()
+inline int delete_asset(const std::string &asset)
+{
+    return fty_shm_delete_asset(asset.c_str());
+}
 
 // Fill the passed vector with assets known to the storage. Note that for
 // optimization purposes, the result can also include assets with expired
