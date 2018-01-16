@@ -256,6 +256,41 @@ int fty::shm::find_assets(Assets &assets)
     return 0;
 }
 
+int fty::shm::read_asset_metrics(const std::string &asset, Metrics &metrics)
+{
+    DIR *dir;
+    struct dirent *de;
+    int err = -1;
+
+    if (!(dir = opendir(shm_dir)))
+        return -1;
+
+    metrics.clear();
+    while ((de = readdir(dir))) {
+        const char *delim = strchr(de->d_name, ':');
+        size_t len = strlen(de->d_name);
+        if (!delim || len < SUFFIX_LEN)
+            // Malformed filename
+            continue;
+        size_t asset_len = delim - de->d_name;
+        size_t metric_len = len - asset_len - strlen(":") - SUFFIX_LEN;
+        if (strncmp(de->d_name + len - SUFFIX_LEN, METRIC_SUFFIX, SUFFIX_LEN) != 0)
+            // Not a metric
+            continue;
+	if (std::string(de->d_name, asset_len) != asset)
+            continue;
+        std::string value;
+        char filename[PATH_BUF_SIZE];
+        sprintf(filename, "%s/%s", shm_dir, de->d_name);
+        if (read_value(filename, value) < 0)
+            continue;
+        err = 0;
+        metrics.emplace(std::string(delim + 1, metric_len), value);
+    }
+    closedir(dir);
+    return err;
+}
+
 //  --------------------------------------------------------------------------
 //  Self test of this class
 
@@ -331,6 +366,12 @@ fty_shm_test (bool verbose)
     assert(std::find(assets.begin(), assets.end(), asset1) != assets.end());
     assert(std::find(assets.begin(), assets.end(), asset2) != assets.end());
 
+    // Load all metrics for an asset
+    fty::shm::Metrics metrics;
+    check_err(fty::shm::read_asset_metrics(asset1, metrics));
+    assert(metrics.size() == 2);
+    assert(metrics[metric1] == value2);
+    assert(metrics[metric2] == value1);
 
     // TTL OK
     check_err(fty_shm_write_metric(asset2, metric1, value2, INT_MAX));

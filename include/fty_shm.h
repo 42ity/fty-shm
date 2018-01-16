@@ -61,7 +61,7 @@ namespace fty {
 namespace shm {
 
 typedef std::vector<std::string> Assets;
-typedef std::unordered_map<std::string, std::string> AssetMetrics;
+typedef std::unordered_map<std::string, std::string> Metrics;
 
 // C++ wrapper for fty_shm_write_metric()
 inline int write_metric(const std::string &asset, const std::string &metric, const std::string &value, int ttl)
@@ -79,6 +79,11 @@ int read_metric(const std::string &asset, const std::string &metric, std::string
 // Returns 0 on success. On error, returns -1 sets errno accordingly and leaves
 // the vector intact
 int find_assets(Assets &assets);
+
+// Fill the passed map with metrics stored for this asset. Returns an error
+// only if there is no valid metric for this asset.
+// Returns 0 on success. On error, returns -1 and sets errno accordingly
+int read_asset_metrics(const std::string &asset, Metrics &metrics);
 
 }
 }
