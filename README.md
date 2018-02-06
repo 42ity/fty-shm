@@ -12,8 +12,9 @@ library guarantees that the data will be consistent.
 ```c
 // All functions return < 0 on error and set errno accordingly.
 
-fty_shm_write_metric("myasset", "voltage", "230", 300 /* TTL */);
-fty_shm_read_metric("myasset", "voltage", &value);
+fty_shm_write_metric("myasset", "voltage", "230", "V", 300 /* TTL */);
+char *value, *unit;
+fty_shm_read_metric("myasset", "voltage", &value, &unit);
 fty_shm_delete_asset("myasset");
 ```
 
@@ -24,20 +25,21 @@ using namespace fty::shm;
 
 // All string arguments are of type std::string. Same error singalling as with the C api
 
-write_metric("myasset", "voltage", "230", 300);
-read_metric("myasset", "voltage", value);
+write_metric("myasset", "voltage", "230", "V", 300);
+std::string value, unit;
+read_metric("myasset", "voltage", value, unit);
 delete_asset("myasset");
 
 Assets assets;
 if (find_assets(assets) < 0)
     return;
 for (auto a : assets) {
-    AssetMetrics metrics;
-    if (read_asset_metrics(a) < 0)
+    Metrics metrics;
+    if (read_asset_metrics(a, metrics) < 0)
 	continue;
     std::cout << "Asset: " << a << std::endl;
     for (auto m : metrics)
-        std::cout << m.first << ": " << m.second << std::endl;
+        std::cout << m.first << ": " << m.second.value << m.second.unit << std::endl;
 }
 ```
 
