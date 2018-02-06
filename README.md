@@ -45,4 +45,3 @@ for (auto a : assets) {
 
 ## TODO
 * A janitor process is needed to clean up stale metrics.
-* `/var/run/fty-shm-1` needs to be created during boot.
