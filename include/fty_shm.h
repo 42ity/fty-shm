@@ -46,6 +46,10 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
 // Delete all metrics associated with this asset from shm
 int fty_shm_delete_asset(const char* asset);
 
+// Use a custom storage directory for test purposes (the passed string must
+// not be freed)
+void fty_shm_set_test_dir(const char *dir);
+
 void fty_shm_test(bool verbose);
 
 #ifdef __cplusplus

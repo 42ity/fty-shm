@@ -35,8 +35,6 @@
 #define DEFAULT_SHM_DIR "/var/run/fty-shm-1"
 #define METRIC_SUFFIX ".metric"
 #define SUFFIX_LEN (sizeof(METRIC_SUFFIX) - 1)
-// DEFAULT_SHM_DIR "/" FILENAME NUL
-#define PATH_BUF_SIZE (sizeof(DEFAULT_SHM_DIR) + NAME_MAX + 1)
 
 // The first 11 bytes of each file are the ttl in 10 decimal digits, followed
 // by \n.  This is a compromise between machine and human readability
@@ -107,7 +105,7 @@ static ssize_t read_buf(int fd, std::string& buf, size_t len)
 static int write_value(const char* filename, const char* value, const char* unit, int ttl)
 {
     int fd;
-    char header[HEADER_LEN + 1], tmp[PATH_BUF_SIZE];
+    char header[HEADER_LEN + 1], tmp[PATH_MAX];
 
     snprintf(tmp, sizeof(tmp), "%s/tmp.XXXXXX", shm_dir);
     if ((fd = mkostemp(tmp, O_CLOEXEC)) < 0)
@@ -240,7 +238,7 @@ out_fd:
 
 int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl)
 {
-    char filename[PATH_BUF_SIZE];
+    char filename[PATH_MAX];
 
     if (validate_names(asset, metric) < 0)
         return -1;
@@ -250,7 +248,7 @@ int fty_shm_write_metric(const char* asset, const char* metric, const char* valu
 
 int fty_shm_read_metric(const char* asset, const char* metric, char** value, char** unit)
 {
-    char filename[PATH_BUF_SIZE];
+    char filename[PATH_MAX];
 
     if (validate_names(asset, metric) < 0)
         return -1;
@@ -279,7 +277,7 @@ int fty_shm_delete_asset(const char* asset)
         size_t asset_len = delim - de->d_name;
         if (std::string(de->d_name, asset_len) != asset)
             continue;
-        char filename[PATH_BUF_SIZE];
+        char filename[PATH_MAX];
         sprintf(filename, "%s/%s", shm_dir, de->d_name);
         if (unlink(filename) < 0)
             err = -1;
@@ -288,9 +286,14 @@ int fty_shm_delete_asset(const char* asset)
     return err;
 }
 
+void fty_shm_set_test_dir(const char *dir)
+{
+    shm_dir = dir;
+}
+
 int fty::shm::read_metric(const std::string& asset, const std::string& metric, std::string& value)
 {
-    char filename[PATH_BUF_SIZE];
+    char filename[PATH_MAX];
     std::string dummy;
 
     if (validate_names(asset, metric) < 0)
@@ -301,7 +304,7 @@ int fty::shm::read_metric(const std::string& asset, const std::string& metric, s
 
 int fty::shm::read_metric(const std::string& asset, const std::string& metric, std::string& value, std::string& unit)
 {
-    char filename[PATH_BUF_SIZE];
+    char filename[PATH_MAX];
 
     if (validate_names(asset, metric) < 0)
         return -1;
@@ -358,7 +361,7 @@ int fty::shm::read_asset_metrics(const std::string& asset, Metrics& metrics)
         if (std::string(de->d_name, asset_len) != asset)
             continue;
         Metric metric;
-        char filename[PATH_BUF_SIZE];
+        char filename[PATH_MAX];
         sprintf(filename, "%s/%s", shm_dir, de->d_name);
         if (read_value(filename, metric.value, metric.unit) < 0)
             continue;
@@ -396,6 +399,11 @@ void fty_shm_test(bool verbose)
 
     printf(" * fty_shm: ");
 
+    fty_shm_set_test_dir("src/selftest-rw");
+    check_err(access("src/selftest-rw", X_OK | W_OK));
+    // The buildsystem does not delete this for some reason
+    system("rm -f src/selftest-rw/*");
+
     // Check for invalid characters
     assert(fty_shm_write_metric("invalid/asset", metric1, value1, unit1, 0) < 0);
     assert(fty_shm_read_metric("invalid/asset", metric1, &value, NULL) < 0);
@@ -416,12 +424,6 @@ void fty_shm_test(bool verbose)
     assert(fty_shm_read_metric(asset1, name2long, &value, NULL) < 0);
     assert(!value);
     free(name2long);
-
-    shm_dir = "src/selftest-rw";
-    assert(strlen(shm_dir) <= strlen(DEFAULT_SHM_DIR));
-    check_err(access(shm_dir, X_OK | W_OK));
-    // The buildsystem does not delete this for some reason
-    system("rm -f src/selftest-rw/*");
 
     // Check that the storage is empty
     fty::shm::Assets assets;
