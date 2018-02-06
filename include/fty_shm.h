@@ -37,11 +37,11 @@ extern "C" {
 // length). TTL is the number of seconds for which this metric is valid,
 // where 0 means infinity
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
-int fty_shm_write_metric(const char *asset, const char *metric, const char *value, int ttl);
+int fty_shm_write_metric(const char *asset, const char *metric, const char *value, const char *unit, int ttl);
 
-// Retrieve a metric from shm. Caller must free the returned value
+// Retrieve a metric from shm. Caller must free the returned values.
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
-int fty_shm_read_metric(const char *asset, const char *metric, char **value);
+int fty_shm_read_metric(const char *asset, const char *metric, char **value, char **unit);
 
 // Delete all metrics associated with this asset from shm
 int fty_shm_delete_asset(const char *asset);
@@ -64,16 +64,30 @@ namespace fty {
 namespace shm {
 
 typedef std::vector<std::string> Assets;
-typedef std::unordered_map<std::string, std::string> Metrics;
+struct Metric {
+    std::string value;
+    std::string unit;
+};
+typedef std::unordered_map<std::string, Metric> Metrics;
 
-// C++ wrapper for fty_shm_write_metric()
-inline int write_metric(const std::string &asset, const std::string &metric, const std::string &value, int ttl)
+// C++ wrappers for fty_shm_write_metric()
+inline int write_metric(const std::string &asset, const std::string &metric, const std::string &value, const std::string &unit, int ttl)
 {
-    return fty_shm_write_metric(asset.c_str(), metric.c_str(), value.c_str(), ttl);
+    return fty_shm_write_metric(asset.c_str(), metric.c_str(), value.c_str(), unit.c_str(), ttl);
 }
+inline int write_metric(const std::string &asset, const std::string &metric, const Metric &value, int ttl)
+{
+    return fty_shm_write_metric(asset.c_str(), metric.c_str(), value.value.c_str(), value.unit.c_str(), ttl);
+}
+
 
 // C++ version of fty_shm_read_metric()
 int read_metric(const std::string &asset, const std::string &metric, std::string &value);
+int read_metric(const std::string &asset, const std::string &metric, std::string &value, std::string &unit);
+inline int read_metric(const std::string &asset, const std::string &metric, Metric &result)
+{
+    return read_metric(asset, metric, result.value, result.unit);
+}
 
 // C++ wrapper for fty_shm_delete_asset()
 inline int delete_asset(const std::string &asset)

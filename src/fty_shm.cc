@@ -43,6 +43,13 @@
 #define TTL_FMT "%010d\n"
 #define TTL_LEN 11
 
+// The next 11 bytes specify the unit of the metric, right-padded with spaces
+// and followed by \n
+#define UNIT_FMT "%-10.10s\n"
+#define UNIT_LEN 11
+
+#define HEADER_LEN (TTL_LEN + UNIT_LEN)
+
 // This is only changed by the selftest code
 static const char *shm_dir = DEFAULT_SHM_DIR;
 
@@ -98,19 +105,20 @@ static ssize_t read_buf(int fd, std::string &buf, size_t len)
 }
 
 // Write ttl and value to filename.tmp and atomically replace filename
-static int write_value(const char *filename, const char *value, int ttl)
+static int write_value(const char *filename, const char *value, const char *unit, int ttl)
 {
     int fd;
-    char ttl_str[TTL_LEN + 1], tmp[PATH_BUF_SIZE];
+    char header[HEADER_LEN + 1], tmp[PATH_BUF_SIZE];
 
     snprintf(tmp, sizeof(tmp), "%s/tmp.XXXXXX", shm_dir);
     if ((fd = mkostemp(tmp, O_CLOEXEC)) < 0)
         return -1;
     if (ttl < 0)
         ttl = 0;
-    snprintf(ttl_str, sizeof(ttl_str), TTL_FMT, ttl);
+    snprintf(header, TTL_LEN + 1, TTL_FMT, ttl);
+    snprintf(header + TTL_LEN, UNIT_LEN + 1, UNIT_FMT, unit);
     // XXX: We can combine this using writev()
-    if (write_buf(fd, ttl_str, TTL_LEN) < 0 ||
+    if (write_buf(fd, header, HEADER_LEN) < 0 ||
                 write_buf(fd, value, strlen(value)) < 0) {
         close(fd);
         goto out_unlink;
@@ -126,99 +134,134 @@ out_unlink:
     return -1;
 }
 
-bool alloc_str(char * &str, size_t len)
+static bool alloc_str(char* &str, size_t len)
 {
-    char *tmp = (char *)malloc(len + 1);
-    if (!tmp)
+    str = (char *)malloc(len + 1);
+    if (!str)
         return false;
-    str = tmp;
+    str[len] = '\0';
     return true;
 }
 
-bool alloc_str(std::string &str, size_t len)
+static bool alloc_str(std::string &str, size_t len)
 {
     str.resize(len);
     return true;
 }
 
-void free_str(char * &str)
+static void free_str(char * &str)
 {
     free(str);
     str = NULL;
 }
 
-void free_str(std::string &str)
+static void free_str(std::string &str)
 {
     // NO-OP
 }
 
+static void trim_str(char* &str, size_t len)
+{
+    str[len] = '\0';
+}
+
+static void trim_str(std::string &str, size_t len)
+{
+    str.resize(len);
+}
+
 // XXX: The error codes are somewhat arbitrary
 template<typename T>
-static int read_value(const char *filename, T &value)
+static int read_value(const char *filename, T &value, T &unit, bool need_unit = true)
 {
     int fd;
     struct stat st;
     size_t size;
     char ttl_str[TTL_LEN], *err;
-    T buf;
+    T value_buf = T(), unit_buf = T();
     time_t now, ttl;
     int ret = -1;
 
     if ((fd = open(filename, O_RDONLY | O_CLOEXEC)) < 0)
         return ret;
     if (fstat(fd, &st) < 0)
-        goto out;
+        goto out_fd;
     if (st.st_size < TTL_LEN) {
         errno = EIO;
-        goto out;
+        goto out_fd;
     }
     if (read_buf(fd, ttl_str, TTL_LEN) < 0)
-        goto out;
+        goto out_fd;
     // Delete the '\n'
     ttl_str[TTL_LEN - 1] = '\0';
     ttl = strtol(ttl_str, &err, 10);
     if (err != ttl_str + TTL_LEN - 1) {
         errno = ERANGE;
-        goto out;
+        goto out_fd;
     }
     now = time(NULL);
     if (now - st.st_mtime > ttl) {
         errno = ESTALE;
-        goto out;
+        goto out_fd;
     }
-    size = st.st_size - TTL_LEN;
-    if (!alloc_str(buf, size))
-        goto out;
-    buf[size] = '\0';
-    if (read_buf(fd, buf, size) < 0) {
-        free_str(buf);
-        goto out;
+    if (need_unit) {
+        if (!alloc_str(unit_buf, UNIT_LEN) < 0)
+            goto out_fd;
+        if (read_buf(fd, unit_buf, UNIT_LEN) < 0)
+            goto out_unit;
+        // Trim the padding spaces
+        int i = UNIT_LEN - 1;
+        while (unit_buf[i] == ' ' || unit_buf[i] == '\n')
+            --i;
+        trim_str(unit_buf, i + 1);
+
+    } else {
+        if (lseek(fd, UNIT_LEN, SEEK_CUR) < 0)
+            goto out_fd;
     }
-    value = buf;
-    ret = 0;
-out:
+    size = st.st_size - HEADER_LEN;
+    if (!alloc_str(value_buf, size))
+        goto out_unit;
+    if (read_buf(fd, value_buf, size) < 0)
+        goto out_value;
+    value = value_buf;
+    if (need_unit)
+        unit = unit_buf;
+    close(fd);
+    return 0;
+
+out_value:
+    free_str(value_buf);
+out_unit:
+    if (need_unit)
+        free_str(unit_buf);
+out_fd:
     close(fd);
     return ret;
 }
 
-int fty_shm_write_metric(const char *asset, const char *metric, const char *value, int ttl)
+int fty_shm_write_metric(const char *asset, const char *metric, const char *value, const char *unit, int ttl)
 {
     char filename[PATH_BUF_SIZE];
 
     if (validate_names(asset, metric) < 0)
         return -1;
     sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset, metric);
-    return write_value(filename, value, ttl);
+    return write_value(filename, value, unit, ttl);
 }
 
-int fty_shm_read_metric(const char *asset, const char *metric, char **value)
+int fty_shm_read_metric(const char *asset, const char *metric, char **value, char **unit)
 {
     char filename[PATH_BUF_SIZE];
 
     if (validate_names(asset, metric) < 0)
         return -1;
     sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset, metric);
-    return read_value(filename, *value);
+    if (!unit) {
+        char *dummy;
+        return read_value(filename, *value, dummy, false);
+    }
+    return read_value(filename, *value, *unit);
 }
 
 int fty_shm_delete_asset(const char *asset)
@@ -251,11 +294,22 @@ int fty_shm_delete_asset(const char *asset)
 int fty::shm::read_metric(const std::string &asset, const std::string &metric, std::string &value)
 {
     char filename[PATH_BUF_SIZE];
+    std::string dummy;
 
     if (validate_names(asset, metric) < 0)
         return -1;
     sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset.c_str(), metric.c_str());
-    return read_value(filename, value);
+    return read_value(filename, value, dummy, false);
+}
+
+int fty::shm::read_metric(const std::string &asset, const std::string &metric, std::string &value, std::string &unit)
+{
+    char filename[PATH_BUF_SIZE];
+
+    if (validate_names(asset, metric) < 0)
+        return -1;
+    sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset.c_str(), metric.c_str());
+    return read_value(filename, value, unit);
 }
 
 int fty::shm::find_assets(Assets &assets)
@@ -306,13 +360,13 @@ int fty::shm::read_asset_metrics(const std::string &asset, Metrics &metrics)
             continue;
 	if (std::string(de->d_name, asset_len) != asset)
             continue;
-        std::string value;
+        Metric metric;
         char filename[PATH_BUF_SIZE];
         sprintf(filename, "%s/%s", shm_dir, de->d_name);
-        if (read_value(filename, value) < 0)
+        if (read_value(filename, metric.value, metric.unit) < 0)
             continue;
         err = 0;
-        metrics.emplace(std::string(delim + 1, metric_len), value);
+        metrics.emplace(std::string(delim + 1, metric_len), metric);
     }
     closedir(dir);
     return err;
@@ -334,19 +388,23 @@ void
 fty_shm_test (bool verbose)
 {
     char *value = NULL;
-    std::string string;
+    char *unit = NULL;
+    std::string cpp_value;
+    std::string cpp_unit;
+    fty::shm::Metric cpp_result;
     const char *asset1 = "test_asset_1", *asset2 = "test_asset_2";
     const char *metric1 = "test_metric_1", *metric2 = "test_metric_2";
     const char *value1 = "hello world", *value2 = "This is\na metric";
+    const char *unit1 = "unit1", *unit2 = "unit2";
 
     printf (" * fty_shm: ");
 
     // Check for invalid characters
-    assert(fty_shm_write_metric("invalid/asset", metric1, value1, 0) < 0);
-    assert(fty_shm_read_metric ("invalid/asset", metric1, &value) < 0);
+    assert(fty_shm_write_metric("invalid/asset", metric1, value1, unit1, 0) < 0);
+    assert(fty_shm_read_metric("invalid/asset", metric1, &value, NULL) < 0);
     assert(!value);
-    assert(fty_shm_write_metric(asset1, "invalid:metric", value1, 0) < 0);
-    assert(fty_shm_read_metric (asset1, "invalid:metric", &value) < 0);
+    assert(fty_shm_write_metric(asset1, "invalid:metric", value1, unit1, 0) < 0);
+    assert(fty_shm_read_metric(asset1, "invalid:metric", &value, NULL) < 0);
     assert(!value);
 
     // Check for too long asset or metric name
@@ -354,11 +412,11 @@ fty_shm_test (bool verbose)
     assert(name2long);
     memset(name2long, 'A', NAME_MAX + 9);
     name2long[NAME_MAX + 9] = '\0';
-    assert(fty_shm_write_metric(name2long, metric1, value1, 300) < 0);
-    assert(fty_shm_read_metric (name2long, metric1, &value) < 0);
+    assert(fty_shm_write_metric(name2long, metric1, value1, unit1, 300) < 0);
+    assert(fty_shm_read_metric(name2long, metric1, &value, NULL) < 0);
     assert(!value);
-    assert(fty_shm_write_metric(asset1, name2long, value1, 300) < 0);
-    assert(fty_shm_read_metric (asset1, name2long, &value) < 0);
+    assert(fty_shm_write_metric(asset1, name2long, value1, unit1, 300) < 0);
+    assert(fty_shm_read_metric(asset1, name2long, &value, NULL) < 0);
     assert(!value);
     free(name2long);
 
@@ -374,20 +432,34 @@ fty_shm_test (bool verbose)
     assert(assets.size() == 0);
 
     // Write and read back a metric
-    check_err(fty_shm_write_metric(asset1, metric1, value1, 0));
-    check_err(fty_shm_read_metric (asset1, metric1, &value));
+    check_err(fty_shm_write_metric(asset1, metric1, value1, unit1, 0));
+    check_err(fty_shm_read_metric(asset1, metric1, &value, &unit));
+    assert(value);
+    assert(streq(value, value1));
+    zstr_free(&value);
+    assert(unit);
+    assert(streq(unit, unit1));
+    zstr_free(&unit);
+    check_err(fty_shm_read_metric(asset1, metric1, &value, NULL));
     assert(value);
     assert(streq(value, value1));
     zstr_free(&value);
 
     // Update a metric (C++)
-    check_err(fty::shm::write_metric(asset1, metric1, value2, 0));
-    check_err(fty::shm::read_metric (asset1, metric1, string));
-    assert(string == value2);
+    check_err(fty::shm::write_metric(asset1, metric1, value2, unit2, 0));
+    check_err(fty::shm::read_metric(asset1, metric1, cpp_value, cpp_unit));
+    assert(cpp_value == value2);
+    assert(cpp_unit == unit2);
+    cpp_value = "";
+    check_err(fty::shm::read_metric(asset1, metric1, cpp_value));
+    assert(cpp_value == value2);
+    check_err(fty::shm::read_metric(asset1, metric1, cpp_result));
+    assert(cpp_result.value == value2);
+    assert(cpp_result.unit == unit2);
 
     // List assets
-    check_err(fty_shm_write_metric(asset1, metric2, value1, 0));
-    check_err(fty_shm_write_metric(asset2, metric1, value1, 0));
+    check_err(fty_shm_write_metric(asset1, metric2, value1, unit1, 0));
+    check_err(fty_shm_write_metric(asset2, metric1, value1, unit1, 0));
     fty::shm::find_assets(assets);
     assert(assets.size() == 2);
     assert(std::find(assets.begin(), assets.end(), asset1) != assets.end());
@@ -397,8 +469,10 @@ fty_shm_test (bool verbose)
     fty::shm::Metrics metrics;
     check_err(fty::shm::read_asset_metrics(asset1, metrics));
     assert(metrics.size() == 2);
-    assert(metrics[metric1] == value2);
-    assert(metrics[metric2] == value1);
+    assert(metrics[metric1].value == value2);
+    assert(metrics[metric1].unit == unit2);
+    assert(metrics[metric2].value == value1);
+    assert(metrics[metric2].unit == unit1);
 
     // Delete asset1 and check that asset2 remains
     check_err(fty::shm::delete_asset(asset1));
@@ -407,16 +481,19 @@ fty_shm_test (bool verbose)
     assert(metrics.size() == 1);
 
     // TTL OK
-    check_err(fty_shm_write_metric(asset2, metric1, value2, INT_MAX));
-    check_err(fty_shm_read_metric (asset2, metric1, &value));
+    check_err(fty_shm_write_metric(asset2, metric1, value2, unit2, INT_MAX));
+    check_err(fty_shm_read_metric(asset2, metric1, &value, &unit));
     assert(value);
     assert(streq(value, value2));
     zstr_free(&value);
+    assert(unit);
+    assert(streq(unit, unit2));
+    zstr_free(&unit);
 
     // TTL expired
-    check_err(fty_shm_write_metric(asset2, metric1, value2, 1));
+    check_err(fty_shm_write_metric(asset2, metric1, value2, unit2, 1));
     sleep(2);
-    assert(fty_shm_read_metric (asset2, metric1, &value) < 0);
+    assert(fty_shm_read_metric(asset2, metric1, &value, NULL) < 0);
     assert(!value);
 
     printf ("OK\n");
