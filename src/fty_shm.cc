@@ -560,6 +560,11 @@ void fty_shm_test(bool verbose)
     assert(cpp_result.value == value2);
     assert(cpp_result.unit == unit2);
 
+    // Write a metric as double
+    check_err(fty::shm::write_metric(asset1, metric2, 42.0, "%", 0));
+    check_err(fty::shm::read_metric(asset1, metric2, cpp_value));
+    assert(cpp_value.compare(0, 4, "42.0") == 0 || cpp_value.compare(0, 4, "41.9") == 0);
+
     // List assets
     check_err(fty_shm_write_metric(asset1, metric2, value1, unit1, 0));
     check_err(fty_shm_write_metric(asset2, metric1, value1, unit1, 0));
