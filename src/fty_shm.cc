@@ -195,10 +195,12 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
         errno = ERANGE;
         goto out_fd;
     }
-    now = time(NULL);
-    if (now - st.st_mtime > ttl) {
-        errno = ESTALE;
-        goto out_fd;
+    if (ttl) {
+        now = time(NULL);
+        if (now - st.st_mtime > ttl) {
+            errno = ESTALE;
+            goto out_fd;
+        }
     }
     if (need_unit) {
         if (!alloc_str(unit_buf, UNIT_LEN) < 0)
@@ -432,6 +434,7 @@ void fty_shm_test(bool verbose)
 
     // Write and read back a metric
     check_err(fty_shm_write_metric(asset1, metric1, value1, unit1, 0));
+    usleep(1100000);
     check_err(fty_shm_read_metric(asset1, metric1, &value, &unit));
     assert(value);
     assert(streq(value, value1));
