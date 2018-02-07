@@ -303,9 +303,14 @@ int fty_shm_delete_asset(const char* asset)
     return err;
 }
 
-void fty_shm_set_test_dir(const char *dir)
+int fty_shm_set_test_dir(const char* dir)
 {
+    if (strlen(dir) > PATH_MAX - strlen("/") - NAME_MAX) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
     shm_dir = dir;
+    return 0;
 }
 
 // renameat2() is unfortunately Linux-specific and glibc does not even
@@ -497,7 +502,7 @@ void fty_shm_test(bool verbose)
 
     printf(" * fty_shm: ");
 
-    fty_shm_set_test_dir("src/selftest-rw");
+    check_err(fty_shm_set_test_dir("src/selftest-rw"));
     check_err(access("src/selftest-rw", X_OK | W_OK));
     // The buildsystem does not delete this for some reason
     system("rm -f src/selftest-rw/*");

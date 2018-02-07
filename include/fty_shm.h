@@ -48,7 +48,7 @@ int fty_shm_delete_asset(const char* asset);
 
 // Use a custom storage directory for test purposes (the passed string must
 // not be freed)
-void fty_shm_set_test_dir(const char *dir);
+int fty_shm_set_test_dir(const char* dir);
 
 void fty_shm_test(bool verbose);
 
