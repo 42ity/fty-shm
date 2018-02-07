@@ -505,7 +505,7 @@ void fty_shm_test(bool verbose)
     check_err(fty_shm_set_test_dir("src/selftest-rw"));
     check_err(access("src/selftest-rw", X_OK | W_OK));
     // The buildsystem does not delete this for some reason
-    system("rm -f src/selftest-rw/*");
+    assert(system("rm -f src/selftest-rw/*") == 0);
 
     // Check for invalid characters
     assert(fty_shm_write_metric("invalid/asset", metric1, value1, unit1, 0) < 0);
