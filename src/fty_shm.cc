@@ -218,7 +218,7 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
         }
     }
     if (need_unit) {
-        if (!alloc_str(unit_buf, UNIT_LEN) < 0)
+        if (!alloc_str(unit_buf, UNIT_LEN))
             goto out_fd;
         if (read_buf(fd, unit_buf, UNIT_LEN) < 0)
             goto out_unit;
