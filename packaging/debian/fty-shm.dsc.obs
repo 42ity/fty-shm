@@ -8,6 +8,8 @@ Build-Depends: debhelper (>= 9),
     pkg-config,
     libzmq3-dev,
     libczmq-dev,
+    systemd,
+    dh-systemd,
     asciidoc-base | asciidoc, xmlto,
     dh-autoreconf
 

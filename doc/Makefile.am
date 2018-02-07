@@ -6,7 +6,7 @@
 all-local: doc
 
 # Public programs ("main" tags in project.xml), auto-regenerated:
-MAN1 =
+MAN1 = fty-shm-cleanup.1
 # Public classes ("class" tags in project.xml), auto-regenerated:
 MAN3 = fty_shm.3
 # Project overview, written by a human after initial skeleton:
@@ -67,6 +67,10 @@ GENERATED_DOCS =
 GENERATED_DOCS += fty_shm.txt fty_shm.doc
 fty_shm.txt: $(top_srcdir)/src/fty_shm.cc
 	"$(srcdir)/mkman" "fty_shm" "$(builddir)/fty_shm.txt" "$(srcdir)/.."
+
+GENERATED_DOCS += fty-shm-cleanup.txt fty-shm-cleanup.doc
+fty-shm-cleanup.txt: $(top_srcdir)/src/fty_shm_cleanup.cc
+	"$(srcdir)/mkman" "fty_shm_cleanup" "$(builddir)/fty-shm-cleanup.txt" "$(srcdir)/.."
 
 
 clean-local:

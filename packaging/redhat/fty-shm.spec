@@ -28,6 +28,7 @@
 %else
 %define DRAFTS no
 %endif
+%define SYSTEMD_UNIT_DIR %(pkg-config --variable=systemdsystemunitdir systemd)
 Name:           fty-shm
 Version:        1.0.0
 Release:        1
@@ -45,6 +46,9 @@ BuildRequires:  automake
 BuildRequires:  autoconf
 BuildRequires:  libtool
 BuildRequires:  pkgconfig
+BuildRequires:  systemd-devel
+BuildRequires:  systemd
+%{?systemd_requires}
 BuildRequires:  xmlto
 BuildRequires:  gcc-c++
 BuildRequires:  zeromq-devel
@@ -93,7 +97,7 @@ This package contains development files for fty-shm: lockless metric sharing lib
 
 %build
 sh autogen.sh
-%{configure} --enable-drafts=%{DRAFTS}
+%{configure} --enable-drafts=%{DRAFTS} --with-systemd-units
 make %{_smp_mflags}
 
 %install
@@ -103,5 +107,21 @@ make install DESTDIR=%{buildroot} %{?_smp_mflags}
 find %{buildroot} -name '*.a' | xargs rm -f
 find %{buildroot} -name '*.la' | xargs rm -f
 
+%files
+%defattr(-,root,root)
+%doc README.md
+%{_bindir}/fty-shm-cleanup
+%{_mandir}/man1/fty-shm-cleanup*
+%config(noreplace) %{_sysconfdir}/fty-shm/fty-shm-cleanup.cfg
+%{SYSTEMD_UNIT_DIR}/fty-shm-cleanup.service
+%dir %{_sysconfdir}/fty-shm
+%if 0%{?suse_version} > 1315
+%post
+%systemd_post fty-shm-cleanup.service
+%preun
+%systemd_preun fty-shm-cleanup.service
+%postun
+%systemd_postun_with_restart fty-shm-cleanup.service
+%endif
 
 %changelog

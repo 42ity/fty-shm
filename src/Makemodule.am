@@ -19,6 +19,7 @@ include_HEADERS = \
 
 src_libfty_shm_la_SOURCES = \
     src/fty_shm.cc \
+    src/internal.h \
     src/platform.h
 
 if ENABLE_DRAFTS
@@ -47,6 +48,23 @@ endif
 
 src_libfty_shm_la_LIBADD = ${project_libs}
 
+if WITH_SYSTEMD_UNITS
+systemdsystemunit_DATA =
+endif #WITH_SYSTEMD_UNITS
+
+if ENABLE_FTY_SHM_CLEANUP
+bin_PROGRAMS += src/fty-shm-cleanup
+src_fty_shm_cleanup_CPPFLAGS = ${AM_CPPFLAGS}
+src_fty_shm_cleanup_LDADD = ${program_libs}
+src_fty_shm_cleanup_SOURCES = src/fty_shm_cleanup.cc
+src_fty_shm_cleanup_config_DATA =
+src_fty_shm_cleanup_config_DATA += src/fty-shm-cleanup.cfg
+src_fty_shm_cleanup_configdir = $(sysconfdir)/fty-shm
+if WITH_SYSTEMD_UNITS
+systemdsystemunit_DATA += src/fty-shm-cleanup.service
+endif #WITH_SYSTEMD_UNITS
+endif #ENABLE_FTY_SHM_CLEANUP
+
 if ENABLE_FTY_SHM_SELFTEST
 check_PROGRAMS += src/fty_shm_selftest
 noinst_PROGRAMS += src/fty_shm_selftest
@@ -57,6 +75,7 @@ endif #ENABLE_FTY_SHM_SELFTEST
 
 # define custom target for all products of /src
 src: \
+		src/fty-shm-cleanup \
 		src/fty_shm_selftest \
 		src/libfty_shm.la
 

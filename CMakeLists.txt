@@ -152,6 +152,7 @@ set (fty_shm_headers
     include/fty_shm_library.h
     include/fty_shm.h
     include/fty_shm.h
+    src/internal.h
 )
 
 source_group ("Header Files" FILES ${fty_shm_headers})
@@ -264,6 +265,31 @@ install(
 # executables
 ########################################################################
 add_executable(
+    fty-shm-cleanup
+    "${SOURCE_DIR}/src/fty-shm-cleanup.cc"
+)
+if (TARGET fty_shm)
+target_link_libraries(
+    fty-shm-cleanup
+    fty_shm
+    ${LIBZMQ_LIBRARIES}
+    ${CZMQ_LIBRARIES}
+    ${OPTIONAL_LIBRARIES}
+)
+endif()
+if (NOT TARGET fty_shm AND TARGET fty_shm-static)
+target_link_libraries(
+    fty-shm-cleanup
+    fty_shm-static
+    ${LIBZMQ_LIBRARIES}
+    ${CZMQ_LIBRARIES}
+    ${OPTIONAL_LIBRARIES}
+)
+endif()
+install(TARGETS fty-shm-cleanup
+    RUNTIME DESTINATION bin
+)
+add_executable(
     fty_shm_selftest
     "${SOURCE_DIR}/src/fty_shm_selftest.cc"
 )
@@ -359,6 +385,7 @@ set(cmake_generated ${CMAKE_BINARY_DIR}/CMakeCache.txt
                     ${CMAKE_BINARY_DIR}/src/libfty_shm.pc
                     ${CMAKE_BINARY_DIR}/src/libfty_shm.so
                     ${CMAKE_BINARY_DIR}/src/fty-shm_selftest
+                    ${CMAKE_BINARY_DIR}/src/fty-shm-cleanup
                     ${CMAKE_BINARY_DIR}/src/fty_shm_selftest
 )
 

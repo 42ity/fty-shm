@@ -28,9 +28,14 @@
 
 #include <algorithm>
 #include <dirent.h>
+#include <fcntl.h>
+#include <linux/fs.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #include <unordered_set>
 
-#include "fty_shm_classes.h"
+#include "fty_shm.h"
+#include "internal.h"
 
 #define DEFAULT_SHM_DIR "/var/run/fty-shm-1"
 #define METRIC_SUFFIX ".metric"
@@ -166,6 +171,30 @@ static void trim_str(std::string& str, size_t len)
     str.resize(len);
 }
 
+static int read_times(int fd, struct stat& st, time_t& ttl)
+{
+    char ttl_str[TTL_LEN], *err;
+    int res;
+
+    if (fstat(fd, &st) < 0)
+        return -1;
+    if (st.st_size < TTL_LEN) {
+        errno = EIO;
+        return -1;
+    }
+    if (read_buf(fd, ttl_str, TTL_LEN) < 0)
+        return -1;
+    // Delete the '\n'
+    ttl_str[TTL_LEN - 1] = '\0';
+    res = strtol(ttl_str, &err, 10);
+    if (err != ttl_str + TTL_LEN - 1) {
+        errno = ERANGE;
+        return -1;
+    }
+    ttl = res;
+    return 0;
+}
+
 // XXX: The error codes are somewhat arbitrary
 template <typename T>
 static int read_value(const char* filename, T& value, T& unit, bool need_unit = true)
@@ -173,28 +202,14 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
     int fd;
     struct stat st;
     size_t size;
-    char ttl_str[TTL_LEN], *err;
     T value_buf = T(), unit_buf = T();
     time_t now, ttl;
     int ret = -1;
 
     if ((fd = open(filename, O_RDONLY | O_CLOEXEC)) < 0)
         return ret;
-    if (fstat(fd, &st) < 0)
+    if (read_times(fd, st, ttl) < 0)
         goto out_fd;
-    if (st.st_size < TTL_LEN) {
-        errno = EIO;
-        goto out_fd;
-    }
-    if (read_buf(fd, ttl_str, TTL_LEN) < 0)
-        goto out_fd;
-    // Delete the '\n'
-    ttl_str[TTL_LEN - 1] = '\0';
-    ttl = strtol(ttl_str, &err, 10);
-    if (err != ttl_str + TTL_LEN - 1) {
-        errno = ERANGE;
-        goto out_fd;
-    }
     if (ttl) {
         now = time(NULL);
         if (now - st.st_mtime > ttl) {
@@ -291,6 +306,87 @@ int fty_shm_delete_asset(const char* asset)
 void fty_shm_set_test_dir(const char *dir)
 {
     shm_dir = dir;
+}
+
+// renameat2() is unfortunately Linux-specific and glibc does not even
+// provide a wrapper
+static int rename_noreplace(int dfd, const char* src, const char* dst)
+{
+    return syscall(SYS_renameat2, dfd, src, dfd, dst, RENAME_NOREPLACE);
+}
+
+int fty_shm_cleanup(bool verbose)
+{
+    DIR* dir;
+    int dfd;
+    struct dirent* de;
+    int err = 0;
+
+    if (!(dir = opendir(shm_dir)))
+        return -1;
+    dfd = dirfd(dir);
+
+    while ((de = readdir(dir))) {
+        int fd;
+        time_t now, ttl;
+        struct stat st1, st2;
+        size_t len = strlen(de->d_name);
+
+        if (len < SUFFIX_LEN)
+            // Malformed filename
+            continue;
+        if (strncmp(de->d_name + len - SUFFIX_LEN, METRIC_SUFFIX, SUFFIX_LEN) != 0)
+            // Not a metric
+            continue;
+        if ((fd = openat(dfd, de->d_name, O_RDONLY | O_CLOEXEC)) < 0) {
+            err = -1;
+            continue;
+        }
+        if (read_times(fd, st1, ttl) < 0) {
+            err = -1;
+            close(fd);
+            continue;
+        }
+        close(fd);
+        if (!ttl)
+            continue;
+        now = time(NULL);
+        // We wait for two times the ttl value before deleting the entry
+        if (now - st1.st_mtime <= 2 * ttl)
+            continue;
+        // We can race here, but that is not considered a problem. A
+        // metric not updated for twice the ttl time is already a bug
+        // and the effect of the race is following:
+        // 1. Metric expires
+        // 2. We check that another ttl seconds have passed
+        // 3. Metric gets updated
+        // 4. We erroneously delete the updated metric
+        // 5. We restore the updated metric
+        // i.e. the updated metric disappears briefly between 4. and 5.,
+        // while it had been gone for ttl seconds between 1. and 3.
+        if (renameat(dfd, de->d_name, dfd, ".delete") < 0) {
+            err = -1;
+            continue;
+        }
+        if (fstatat(dfd, ".delete", &st2, 0) < 0) {
+            // This should not happen
+            err = -1;
+            continue;
+        }
+        if (st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino) {
+            if (unlinkat(dfd, ".delete", 0) < 0)
+                err = -1;
+            continue;
+        }
+        // We lost the race. Restore the metric, but only if it has not
+        // been updated for the second time.
+        if (rename_noreplace(dfd, ".delete", de->d_name) < 0) {
+            unlinkat(dfd, ".delete", 0);
+            err = -1;
+        }
+    }
+    closedir(dir);
+    return err;
 }
 
 int fty::shm::read_metric(const std::string& asset, const std::string& metric, std::string& value)
@@ -493,10 +589,16 @@ void fty_shm_test(bool verbose)
     zstr_free(&unit);
 
     // TTL expired
-    check_err(fty_shm_write_metric(asset2, metric1, value2, unit2, 1));
+    check_err(fty_shm_write_metric(asset1, metric1, value2, unit2, 1));
     sleep(2);
-    assert(fty_shm_read_metric(asset2, metric1, &value, NULL) < 0);
+    assert(fty_shm_read_metric(asset1, metric1, &value, NULL) < 0);
     assert(!value);
+
+    // Garbage collector: asset1 expired and must be deleted, asset2 must stay
+    sleep(2);
+    check_err(fty_shm_cleanup(verbose));
+    check_err(access("src/selftest-rw/test_asset_2:test_metric_1.metric", F_OK));
+    assert(access("src/selftest-rw/test_asset_1:test_metric_1.metric", F_OK) < 0);
 
     printf("OK\n");
 }

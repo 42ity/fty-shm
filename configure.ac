@@ -492,6 +492,16 @@ fi
      AC_MSG_RESULT([$enable_dist_cmakefiles])])
 AM_CONDITIONAL(ENABLE_DIST_CMAKEFILES, test "x$enable_dist_cmakefiles" = "xyes")
 
+# Check for fty-shm-cleanup intent
+AC_ARG_ENABLE([fty-shm-cleanup],
+    AS_HELP_STRING([--enable-fty-shm-cleanup],
+        [Compile and install 'fty-shm-cleanup' [default=yes]]),
+    [enable_fty_shm_cleanup=$enableval],
+    [enable_fty_shm_cleanup=yes])
+
+AM_CONDITIONAL([ENABLE_FTY_SHM_CLEANUP], [test x$enable_fty_shm_cleanup != xno])
+AM_COND_IF([ENABLE_FTY_SHM_CLEANUP], [AC_MSG_NOTICE([ENABLE_FTY_SHM_CLEANUP defined])])
+
 # Check for fty_shm_selftest intent
 AC_ARG_ENABLE([fty_shm_selftest],
     AS_HELP_STRING([--enable-fty_shm_selftest],
@@ -508,6 +518,34 @@ AC_CHECK_FUNCS(perror gettimeofday memset getifaddrs)
 
 
 # enable specific system integration features
+AC_ARG_WITH([systemd-units],
+    AS_HELP_STRING([--with-systemd-units],
+    [Build and install with systemd units integration [default=no]]),
+    [with_systemd_units=$withval],
+    [with_systemd_units=no])
+
+PKG_PROG_PKG_CONFIG
+AC_ARG_WITH([systemdsystemunitdir],
+     [AS_HELP_STRING([--with-systemdsystemunitdir=DIR], [Directory for systemd service files])],,
+     [with_systemdsystemunitdir=auto])
+AS_IF([test "x$with_systemdsystemunitdir" = "xyes" -o "x$with_systemdsystemunitdir" = "xauto"], [
+     def_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)
+
+     AS_IF([test "x$def_systemdsystemunitdir" = "x"],
+   [AS_IF([test "x$with_systemdsystemunitdir" = "xyes"],
+    [AC_MSG_ERROR([systemd support requested but pkg-config unable to query systemd package])])
+    with_systemdsystemunitdir=no],
+   [with_systemdsystemunitdir="$def_systemdsystemunitdir"])])
+AS_IF([test "x$with_systemdsystemunitdir" != "xno"],
+      [AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])])
+
+AM_CONDITIONAL([WITH_SYSTEMD_UNITS], [test "x$with_systemdsystemunitdir" != "xno" -a x$with_systemd_units != xno])
+
+AM_COND_IF([WITH_SYSTEMD_UNITS],
+    [AC_DEFINE(WITH_SYSTEMD_UNITS, 1, [systemd units are going to be installed])
+    AC_SUBST(WITH_SYSTEMD_UNITS)],
+    [])
+
 if test "x$cross_compiling" = "xyes"; then
     #   Enable draft by default when cross-compiling
     defaultval=yes
@@ -571,7 +609,14 @@ AS_IF([test "x$enable_Werror" = "xyes" || test "x$enable_Werror" = "xauto"],
 AC_CONFIG_FILES([Makefile
                  doc/Makefile
                  src/libfty_shm.pc
+                 src/fty-shm-cleanup.cfg
                  ])
+
+AM_COND_IF([WITH_SYSTEMD_UNITS],
+    [AC_CONFIG_FILES([
+                 src/fty-shm-cleanup.service
+    ])],
+    [])
 
 
 AC_OUTPUT

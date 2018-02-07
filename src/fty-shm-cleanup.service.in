@@ -1,0 +1,13 @@
+[Unit]
+Description=fty-shm-cleanup service
+After=network.target
+PartOf=bios.target
+
+[Service]
+Type=simple
+User=bios
+Restart=always
+ExecStart=@prefix@/bin/fty-shm-cleanup
+
+[Install]
+WantedBy=bios.target

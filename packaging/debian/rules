@@ -42,11 +42,12 @@ override_dh_auto_test:
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
+		--with-systemd-units \
 		--with-docs=$(DOCS) \
 		--enable-drafts=$(DRAFTS)
 
 %:
 	dh $@ \
+		--with systemd \
 		--parallel \
 		--with autoreconf
-

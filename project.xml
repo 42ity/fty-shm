@@ -19,7 +19,11 @@
     <use project = "czmq"
         repository="https://github.com/42ity/czmq.git" release = "v3.0.2"
         min_major = "3" min_minor = "0" min_patch = "2" />
-    <class name = "fty_shm" state = "stable">FTY metric sharing functions</class>
+		<class name = "fty_shm" state = "stable">FTY metric sharing functions</class>
+		<extra name = "internal.h" />
+		<main name = "fty-shm-cleanup" service = "1" >
+			Garbage collector for fty-shm
+		</main>
     <!-- header name = "pokus" / -->
 
 </project>

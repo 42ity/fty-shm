@@ -1,0 +1,4 @@
+usr/bin/fty-shm-cleanup
+etc/fty-shm/fty-shm-cleanup.cfg
+lib/systemd/system/fty-shm-cleanup.service
+

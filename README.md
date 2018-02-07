@@ -42,6 +42,3 @@ for (auto a : assets) {
         std::cout << m.first << ": " << m.second.value << m.second.unit << std::endl;
 }
 ```
-
-## TODO
-* A janitor process is needed to clean up stale metrics.

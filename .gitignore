@@ -22,6 +22,7 @@ save.xml
 
 # Executables
 src/fty-shm_selftest
+src/fty-shm-cleanup
 src/fty_shm_selftest
 *.exe
 *.out
