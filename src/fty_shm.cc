@@ -605,5 +605,24 @@ void fty_shm_test(bool verbose)
     check_err(access("src/selftest-rw/test_asset_2:test_metric_1.metric", F_OK));
     assert(access("src/selftest-rw/test_asset_1:test_metric_1.metric", F_OK) < 0);
 
+    // Check that we are not leaking file descriptors
+    DIR* dir;
+    struct dirent* de;
+    assert((dir = opendir("/proc/self/fd")));
+    bool ok = true;
+    // Only stdin, stdout, stderr and the directory fd should be open
+    std::unordered_set<std::string> allowed = { ".", "..", "0", "1", "2", std::to_string(dirfd(dir)) };
+    while ((de = readdir(dir))) {
+        if (atoi(de->d_name) >= 1024)
+            // Assume that this is a valgrind internal file descriptor
+            continue;
+        if (allowed.find(de->d_name) == allowed.end()) {
+            printf("File descriptor %s leaked\n", de->d_name);
+            ok = false;
+        }
+    }
+    closedir(dir);
+    if (!ok)
+        abort();
     printf("OK\n");
 }
