@@ -357,7 +357,7 @@ int fty_shm_cleanup(bool verbose)
             continue;
         now = time(NULL);
         // We wait for two times the ttl value before deleting the entry
-        if (now - st1.st_mtime <= 2 * ttl)
+        if ((now - st1.st_mtime) / 2 <= ttl)
             continue;
         // We can race here, but that is not considered a problem. A
         // metric not updated for twice the ttl time is already a bug
