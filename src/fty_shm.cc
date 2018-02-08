@@ -124,6 +124,8 @@ static int write_value(const char* filename, const char* value, const char* unit
         close(fd);
         goto out_unlink;
     }
+    if (fchmod(fd, 0644) < 0)
+        goto out_unlink;
     if (close(fd) < 0)
         goto out_unlink;
     if (rename(tmp, filename) < 0)
