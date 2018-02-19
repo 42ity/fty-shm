@@ -96,25 +96,40 @@ static ssize_t write_vec(int fd, struct iovec* iov, int iovcnt)
     return written;
 }
 
-static ssize_t read_buf(int fd, char* buf, size_t len)
+// XXX: May modify iov
+static ssize_t read_vec(int fd, struct iovec* iov, int iovcnt)
 {
-    size_t done = 0;
+    size_t written = 0, step;
     ssize_t ret;
 
-    while (done < len) {
-        if ((ret = read(fd, buf + done, len - done)) < 0) {
+    while (iovcnt > 0) {
+        if ((ret = readv(fd, iov, iovcnt)) < 0) {
             if (errno == EINTR)
                 continue;
             return -1;
         }
-        done += ret;
+        step = ret;
+        written += step;
+        while (step && step >= iov[0].iov_len) {
+            step -= iov[0].iov_len;
+            iov++;
+            iovcnt--;
+        }
+        if (step > 0) {
+            iov[0].iov_len -= step;
+            iov[0].iov_base = static_cast<char *>(iov[0].iov_base) + step;
+        }
     }
-    return done;
+    return written;
 }
 
-static ssize_t read_buf(int fd, std::string& buf, size_t len)
+static ssize_t read_buf(int fd, char* buf, size_t len)
 {
-    return read_buf(fd, &buf.front(), len);
+    struct iovec iov;
+
+    iov.iov_base = buf;
+    iov.iov_len = len;
+    return read_vec(fd, &iov, 1);
 }
 
 // Write ttl and value to filename.tmp and atomically replace filename
@@ -178,6 +193,17 @@ static void free_str(std::string& str)
     // NO-OP
 }
 
+static char* str_buf(char* str)
+{
+    return str;
+}
+
+static char* str_buf(std::string& str)
+{
+    return &str.front();
+}
+
+
 static void trim_str(char*& str, size_t len)
 {
     str[len] = '\0';
@@ -188,19 +214,11 @@ static void trim_str(std::string& str, size_t len)
     str.resize(len);
 }
 
-static int read_times(int fd, struct stat& st, time_t& ttl)
+static int parse_ttl(char* ttl_str, time_t& ttl)
 {
-    char ttl_str[TTL_LEN], *err;
+    char *err;
     int res;
 
-    if (fstat(fd, &st) < 0)
-        return -1;
-    if (st.st_size < TTL_LEN) {
-        errno = EIO;
-        return -1;
-    }
-    if (read_buf(fd, ttl_str, TTL_LEN) < 0)
-        return -1;
     // Delete the '\n'
     ttl_str[TTL_LEN - 1] = '\0';
     res = strtol(ttl_str, &err, 10);
@@ -220,40 +238,56 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
     struct stat st;
     size_t size;
     T value_buf = T(), unit_buf = T();
+    char unit_dummy[UNIT_LEN];
+    char ttl_str[TTL_LEN];
+    struct iovec iov[3];
     time_t now, ttl;
     int ret = -1;
 
     if ((fd = open(filename, O_RDONLY | O_CLOEXEC)) < 0)
         return ret;
-    if (read_times(fd, st, ttl) < 0)
+    if (fstat(fd, &st) < 0)
         goto out_fd;
+    if (st.st_size < HEADER_LEN) {
+        errno = EIO;
+        return -1;
+    }
+    iov[0].iov_base = ttl_str;
+    iov[0].iov_len = TTL_LEN;
+
+    if (need_unit) {
+        if (!alloc_str(unit_buf, UNIT_LEN))
+            goto out_fd;
+        iov[1].iov_base = str_buf(unit_buf);
+    } else {
+        iov[1].iov_base = unit_dummy;
+    }
+    iov[1].iov_len = TTL_LEN;
+
+    size = st.st_size - HEADER_LEN;
+    if (!alloc_str(value_buf, size))
+        goto out_unit;
+    iov[2].iov_base = str_buf(value_buf);
+    iov[2].iov_len = size;
+    if (read_vec(fd, iov, 3) < 0)
+        goto out_value;
+
+    if (parse_ttl(ttl_str, ttl) < 0)
+        goto out_value;
     if (ttl) {
         now = time(NULL);
         if (now - st.st_mtime > ttl) {
             errno = ESTALE;
-            goto out_fd;
+            goto out_value;
         }
     }
     if (need_unit) {
-        if (!alloc_str(unit_buf, UNIT_LEN))
-            goto out_fd;
-        if (read_buf(fd, unit_buf, UNIT_LEN) < 0)
-            goto out_unit;
         // Trim the padding spaces
         int i = UNIT_LEN - 1;
         while (unit_buf[i] == ' ' || unit_buf[i] == '\n')
             --i;
         trim_str(unit_buf, i + 1);
-
-    } else {
-        if (lseek(fd, UNIT_LEN, SEEK_CUR) < 0)
-            goto out_fd;
     }
-    size = st.st_size - HEADER_LEN;
-    if (!alloc_str(value_buf, size))
-        goto out_unit;
-    if (read_buf(fd, value_buf, size) < 0)
-        goto out_value;
     value = value_buf;
     if (need_unit)
         unit = unit_buf;
@@ -353,6 +387,7 @@ int fty_shm_cleanup(bool verbose)
         time_t now, ttl;
         struct stat st1, st2;
         size_t len = strlen(de->d_name);
+        char ttl_str[TTL_LEN];
 
         if (len < SUFFIX_LEN)
             // Malformed filename
@@ -364,12 +399,26 @@ int fty_shm_cleanup(bool verbose)
             err = -1;
             continue;
         }
-        if (read_times(fd, st1, ttl) < 0) {
+        if (fstat(fd, &st1) < 0) {
+            err = -1;
+            close(fd);
+            continue;
+        }
+        if (st1.st_size < HEADER_LEN) {
+            // Malformed file
+            close(fd);
+            continue;
+        }
+        if (read_buf(fd, ttl_str, TTL_LEN) < 0) {
             err = -1;
             close(fd);
             continue;
         }
         close(fd);
+        if (parse_ttl(ttl_str, ttl) < 0) {
+            err = -1;
+            continue;
+        }
         if (!ttl)
             continue;
         now = time(NULL);
