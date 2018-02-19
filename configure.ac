@@ -131,7 +131,9 @@ AC_ARG_WITH([libzmq],
     [
         search_libzmq="yes"
     ],
-    [])
+    [
+        search_libzmq="yes"
+    ])
 AS_CASE([x"${with_libzmq}"],
     [xyes], [search_libzmq="yes"],
     [xno],  [search_libzmq="no"])
@@ -218,7 +220,9 @@ AC_ARG_WITH([libczmq],
     [
         search_libczmq="yes"
     ],
-    [])
+    [
+        search_libczmq="yes"
+    ])
 AS_CASE([x"${with_libczmq}"],
     [xyes], [search_libczmq="yes"],
     [xno],  [search_libczmq="no"])
@@ -501,6 +505,16 @@ AC_ARG_ENABLE([fty-shm-cleanup],
 
 AM_CONDITIONAL([ENABLE_FTY_SHM_CLEANUP], [test x$enable_fty_shm_cleanup != xno])
 AM_COND_IF([ENABLE_FTY_SHM_CLEANUP], [AC_MSG_NOTICE([ENABLE_FTY_SHM_CLEANUP defined])])
+
+# Check for benchmark intent
+AC_ARG_ENABLE([benchmark],
+    AS_HELP_STRING([--enable-benchmark],
+        [Compile 'benchmark' in src [default=yes]]),
+    [enable_benchmark=$enableval],
+    [enable_benchmark=yes])
+
+AM_CONDITIONAL([ENABLE_BENCHMARK], [test x$enable_benchmark != xno])
+AM_COND_IF([ENABLE_BENCHMARK], [AC_MSG_NOTICE([ENABLE_BENCHMARK defined])])
 
 # Check for fty_shm_selftest intent
 AC_ARG_ENABLE([fty_shm_selftest],

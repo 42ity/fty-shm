@@ -65,6 +65,13 @@ systemdsystemunit_DATA += src/fty-shm-cleanup.service
 endif #WITH_SYSTEMD_UNITS
 endif #ENABLE_FTY_SHM_CLEANUP
 
+if ENABLE_BENCHMARK
+noinst_PROGRAMS += src/benchmark
+src_benchmark_CPPFLAGS = ${AM_CPPFLAGS}
+src_benchmark_LDADD = ${program_libs}
+src_benchmark_SOURCES = src/benchmark.cc
+endif #ENABLE_BENCHMARK
+
 if ENABLE_FTY_SHM_SELFTEST
 check_PROGRAMS += src/fty_shm_selftest
 noinst_PROGRAMS += src/fty_shm_selftest
@@ -76,6 +83,7 @@ endif #ENABLE_FTY_SHM_SELFTEST
 # define custom target for all products of /src
 src: \
 		src/fty-shm-cleanup \
+		src/benchmark \
 		src/fty_shm_selftest \
 		src/libfty_shm.la
 

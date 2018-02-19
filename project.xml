@@ -24,6 +24,9 @@
 		<main name = "fty-shm-cleanup" service = "1" >
 			Garbage collector for fty-shm
 		</main>
+		<main name = "benchmark" private = "1" >
+			fty-shm benchmark
+		</main>
     <!-- header name = "pokus" / -->
 
 </project>

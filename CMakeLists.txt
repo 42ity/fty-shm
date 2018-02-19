@@ -6,7 +6,7 @@
 ########################################################################
 # Project setup
 ########################################################################
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.8)
 project(fty_shm)
 enable_language(CXX)
 enable_testing()
@@ -161,6 +161,8 @@ install(FILES ${fty_shm_headers} DESTINATION include)
 ########################################################################
 # library
 ########################################################################
+
+
 include_directories("${SOURCE_DIR}/src" "${SOURCE_DIR}/include")
 set (fty_shm_sources
     src/fty_shm.cc
@@ -181,9 +183,20 @@ if (NOT FTY_SHM_BUILD_SHARED AND NOT FTY_SHM_BUILD_STATIC)
   message(FATAL_ERROR "Neither static nor shared library build enabled")
 endif()
 
+IF (NOT MSVC)
+  # avoid building everything twice for shared + static
+  # only on *nix, as Windows needs different preprocessor defines in static builds
+  add_library (objects OBJECT ${fty_shm_sources})
+  set_property(TARGET objects PROPERTY POSITION_INDEPENDENT_CODE ON)
+ENDIF (NOT MSVC)
+
 # shared
 if (FTY_SHM_BUILD_SHARED)
-  add_library(fty_shm SHARED ${fty_shm_sources})
+  IF (MSVC)
+    add_library(fty_shm SHARED ${fty_shm_sources})
+  ELSE (MSVC)
+    add_library(fty_shm SHARED $<TARGET_OBJECTS:objects>)
+  ENDIF (MSVC)
 
   set_target_properties (fty_shm PROPERTIES
     PUBLIC_HEADER "${public_headers}"
@@ -191,6 +204,8 @@ if (FTY_SHM_BUILD_SHARED)
     SOVERSION "0"
     VERSION "${FTY_SHM_VERSION}"
     COMPILE_DEFINITIONS "DLL_EXPORT"
+    OUTPUT_NAME "fty_shm"
+    PREFIX "lib"
   )
 
   target_link_libraries(fty_shm
@@ -210,11 +225,17 @@ endif()
 
 # static
 if (FTY_SHM_BUILD_STATIC)
-  add_library(fty_shm-static STATIC ${fty_shm_sources})
+  IF (MSVC)
+    add_library(fty_shm-static STATIC ${fty_shm_sources})
+  ELSE (MSVC)
+    add_library(fty_shm-static STATIC $<TARGET_OBJECTS:objects>)
+  ENDIF (MSVC)
 
   set_target_properties(fty_shm-static PROPERTIES
     PUBLIC_HEADER "${public_headers}"
     COMPILE_DEFINITIONS "FTY_SHM_STATIC"
+    OUTPUT_NAME "fty_shm"
+    PREFIX "lib"
   )
 
   target_link_libraries(fty_shm-static
@@ -289,6 +310,28 @@ endif()
 install(TARGETS fty-shm-cleanup
     RUNTIME DESTINATION bin
 )
+add_executable(
+    benchmark
+    "${SOURCE_DIR}/src/benchmark.cc"
+)
+if (TARGET fty_shm)
+target_link_libraries(
+    benchmark
+    fty_shm
+    ${LIBZMQ_LIBRARIES}
+    ${CZMQ_LIBRARIES}
+    ${OPTIONAL_LIBRARIES}
+)
+endif()
+if (NOT TARGET fty_shm AND TARGET fty_shm-static)
+target_link_libraries(
+    benchmark
+    fty_shm-static
+    ${LIBZMQ_LIBRARIES}
+    ${CZMQ_LIBRARIES}
+    ${OPTIONAL_LIBRARIES}
+)
+endif()
 add_executable(
     fty_shm_selftest
     "${SOURCE_DIR}/src/fty_shm_selftest.cc"
@@ -386,6 +429,7 @@ set(cmake_generated ${CMAKE_BINARY_DIR}/CMakeCache.txt
                     ${CMAKE_BINARY_DIR}/src/libfty_shm.so
                     ${CMAKE_BINARY_DIR}/src/fty-shm_selftest
                     ${CMAKE_BINARY_DIR}/src/fty-shm-cleanup
+                    ${CMAKE_BINARY_DIR}/src/benchmark
                     ${CMAKE_BINARY_DIR}/src/fty_shm_selftest
 )
 
