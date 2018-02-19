@@ -69,18 +69,29 @@ static int validate_names(const std::string& asset, const std::string& metric)
     return 0;
 }
 
-static ssize_t write_buf(int fd, const char* buf, size_t len)
+// XXX: May modify iov
+static ssize_t write_vec(int fd, struct iovec* iov, int iovcnt)
 {
-    size_t written = 0;
+    size_t written = 0, step;
     ssize_t ret;
 
-    while (written < len) {
-        if ((ret = write(fd, buf + written, len - written)) < 0) {
+    while (iovcnt > 0) {
+        if ((ret = writev(fd, iov, iovcnt)) < 0) {
             if (errno == EINTR)
                 continue;
             return -1;
         }
-        written += ret;
+        step = ret;
+        written += step;
+        while (step && step >= iov[0].iov_len) {
+            step -= iov[0].iov_len;
+            iov++;
+            iovcnt--;
+        }
+        if (step > 0) {
+            iov[0].iov_len -= step;
+            iov[0].iov_base = static_cast<char *>(iov[0].iov_base) + step;
+        }
     }
     return written;
 }
@@ -111,6 +122,7 @@ static int write_value(const char* filename, const char* value, const char* unit
 {
     int fd;
     char header[HEADER_LEN + 1], tmp[PATH_MAX];
+    struct iovec iov[2];
 
     snprintf(tmp, sizeof(tmp), "%s/tmp.XXXXXX", shm_dir);
     if ((fd = mkostemp(tmp, O_CLOEXEC)) < 0)
@@ -119,8 +131,11 @@ static int write_value(const char* filename, const char* value, const char* unit
         ttl = 0;
     snprintf(header, TTL_LEN + 1, TTL_FMT, ttl);
     snprintf(header + TTL_LEN, UNIT_LEN + 1, UNIT_FMT, unit);
-    // XXX: We can combine this using writev()
-    if (write_buf(fd, header, HEADER_LEN) < 0 || write_buf(fd, value, strlen(value)) < 0) {
+    iov[0].iov_base = header;
+    iov[0].iov_len = HEADER_LEN;
+    iov[1].iov_base = const_cast<char*>(value);
+    iov[1].iov_len = strlen(value);
+    if (write_vec(fd, iov, 2) < 0) {
         close(fd);
         goto out_unlink;
     }
