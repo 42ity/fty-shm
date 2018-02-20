@@ -56,17 +56,29 @@
 
 // This is only changed by the selftest code
 static const char* shm_dir = DEFAULT_SHM_DIR;
+static size_t shm_dir_len = strlen(DEFAULT_SHM_DIR);
 
-static int validate_names(const std::string& asset, const std::string& metric)
+static int prepare_filename(char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len)
 {
-    if (asset.length() + strlen(":") + metric.length() + SUFFIX_LEN > NAME_MAX) {
+    if (a_len + strlen(":") + m_len + SUFFIX_LEN > NAME_MAX) {
         errno = ENAMETOOLONG;
         return -1;
     }
-    if (asset.find_first_of("/:", 0, 2) != asset.npos || metric.find_first_of("/:", 0, 2) != metric.npos) {
+    if (memchr(asset, '/', a_len) || memchr(asset, ':', a_len) ||
+            memchr(metric, '/', m_len) || memchr(metric, ':', m_len)) {
         errno = EINVAL;
         return -1;
     }
+    char* p = buf;
+    memcpy(p, shm_dir, shm_dir_len);
+    p += shm_dir_len;
+    *p++ = '/';
+    memcpy(p, asset, a_len);
+    p += a_len;
+    *p++ = ':';
+    memcpy(p, metric, m_len);
+    p += m_len;
+    memcpy(p, METRIC_SUFFIX, sizeof(METRIC_SUFFIX));
     return 0;
 }
 
@@ -338,9 +350,8 @@ int fty_shm_write_metric(const char* asset, const char* metric, const char* valu
 {
     char filename[PATH_MAX];
 
-    if (validate_names(asset, metric) < 0)
+    if (prepare_filename(filename, asset, strlen(asset), metric, strlen(metric)) < 0)
         return -1;
-    sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset, metric);
     return write_value(filename, value, unit, ttl);
 }
 
@@ -348,9 +359,8 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
 {
     char filename[PATH_MAX];
 
-    if (validate_names(asset, metric) < 0)
+    if (prepare_filename(filename, asset, strlen(asset), metric, strlen(metric)) < 0)
         return -1;
-    sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset, metric);
     if (!unit) {
         char* dummy;
         return read_value(filename, *value, dummy, false);
@@ -391,6 +401,7 @@ int fty_shm_set_test_dir(const char* dir)
         return -1;
     }
     shm_dir = dir;
+    shm_dir_len = strlen(dir);
     return 0;
 }
 
@@ -495,9 +506,8 @@ int fty::shm::read_metric(const std::string& asset, const std::string& metric, s
     char filename[PATH_MAX];
     std::string dummy;
 
-    if (validate_names(asset, metric) < 0)
+    if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length()) < 0)
         return -1;
-    sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset.c_str(), metric.c_str());
     return read_value(filename, value, dummy, false);
 }
 
@@ -505,9 +515,8 @@ int fty::shm::read_metric(const std::string& asset, const std::string& metric, s
 {
     char filename[PATH_MAX];
 
-    if (validate_names(asset, metric) < 0)
+    if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length()) < 0)
         return -1;
-    sprintf(filename, "%s/%s:%s" METRIC_SUFFIX, shm_dir, asset.c_str(), metric.c_str());
     return read_value(filename, value, unit);
 }
 
