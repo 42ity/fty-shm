@@ -27,7 +27,16 @@
 */
 
 #include <fty_shm.h>
+#include <getopt.h>
+#include <iostream>
 #include <sys/time.h>
+
+static const char help_text[]
+    = "benchmark [options] ...\n"
+      "  -d, --directory=DIR   set a custom storage directory for testing\n"
+      "  -r, --write           only benchmark writes\n"
+      "  -r, --read            only benchmark reads\n"
+      "  -h, --help            display this help text and exit\n";
 
 #define NUM_METRICS 10000
 
@@ -60,11 +69,37 @@ int main(int argc, char **argv)
     int i;
     bool do_read = true, do_write = true;
 
-    if (argc > 1) {
-        if (strcmp(argv[1], "-r") == 0)
+    static struct option long_opts[] = {
+        { "help", no_argument, 0, 'h' },
+        { "directory", required_argument, 0, 'd' },
+        { "write", no_argument, 0, 'w' },
+        { "read", no_argument, 0, 'r' }
+    };
+
+    int c = 0;
+    while (c >= 0) {
+        c = getopt_long(argc, argv, "hd:rw", long_opts, 0);
+
+        switch (c) {
+        case 'h':
+            std::cout << help_text;
+            return 0;
+        case 'd':
+            fty_shm_set_test_dir(optarg);
+            break;
+        case 'r':
             do_write = false;
-        else if (strcmp(argv[1], "-w") == 0)
+            break;
+        case 'w':
             do_read = false;
+            break;
+        case '?':
+            std::cerr << help_text;
+            return 1;
+        default:
+            // Should not happen
+            c = -1;
+        }
     }
 
     timestamp();
