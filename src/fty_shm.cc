@@ -30,6 +30,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <linux/fs.h>
+#include <random>
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <unordered_set>
@@ -132,6 +133,38 @@ static ssize_t read_buf(int fd, char* buf, size_t len)
     return read_vec(fd, &iov, 1);
 }
 
+// We need to create files according to the umask
+static int create_temp(char *buf)
+{
+    // 2**6 == 64 letters
+    static const char letters[] = "0123456789_-"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+    // The seed is not of exceptional quality (ASLR-ed stack address XOR time),
+    // but since the storage directory is protected by filesystem permissions,
+    // we do not need particularly strong randomness.
+    int num, fd;
+    thread_local static std::minstd_rand rnd(reinterpret_cast<long>(&num) >> 4 ^ time(NULL));
+    char *p;
+
+    strcpy(buf, shm_dir);
+    p = buf + strlen(shm_dir);
+    *p++ = '/';
+    for (int attempt = 0; attempt < 100000; ++attempt) {
+        int i;
+        num = rnd();
+        for (i = 0; i < 4; ++i) {
+            p[i] = letters[num & 63];
+            num >>= 6;
+        }
+        p[i] = '\0';
+        fd = open(buf, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666);
+        if (fd >= 0 || errno != EEXIST)
+            return fd;
+    }
+    return fd;
+}
+
 // Write ttl and value to filename.tmp and atomically replace filename
 static int write_value(const char* filename, const char* value, const char* unit, int ttl)
 {
@@ -139,8 +172,7 @@ static int write_value(const char* filename, const char* value, const char* unit
     char header[HEADER_LEN + 1], tmp[PATH_MAX];
     struct iovec iov[2];
 
-    snprintf(tmp, sizeof(tmp), "%s/tmp.XXXXXX", shm_dir);
-    if ((fd = mkostemp(tmp, O_CLOEXEC)) < 0)
+    if ((fd = create_temp(tmp)) < 0)
         return -1;
     if (ttl < 0)
         ttl = 0;
@@ -154,8 +186,6 @@ static int write_value(const char* filename, const char* value, const char* unit
         close(fd);
         goto out_unlink;
     }
-    if (fchmod(fd, 0644) < 0)
-        goto out_unlink;
     if (close(fd) < 0)
         goto out_unlink;
     if (rename(tmp, filename) < 0)
