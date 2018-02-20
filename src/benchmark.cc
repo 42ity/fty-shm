@@ -31,12 +31,14 @@
 #include <iomanip>
 #include <iostream>
 #include <sys/time.h>
+#include <map>
 
 static const char help_text[]
     = "benchmark [options] ...\n"
       "  -d, --directory=DIR   set a custom storage directory for testing\n"
       "  -r, --write           only benchmark writes\n"
       "  -r, --read            only benchmark reads\n"
+      "  -b, --benchmark=NAME  select benchmark to run (use -b help for a list)\n"
       "  -h, --help            display this help text and exit\n";
 
 #define NUM_METRICS 10000
@@ -47,9 +49,24 @@ static const char help_text[]
 #define VALUE_LEN 10
 #define VALUE_FMT "v%08d"
 
-struct timeval tv_start;
+class Benchmark {
+    public:
+        Benchmark() :
+            do_read(true), do_write(true), tv_last()
+        {
+            gettimeofday(&tv_start, NULL);
+        };
+        typedef void(Benchmark::*benchmark_fn)();
+        void c_api_bench();
+        void cpp_api_bench();
+        bool do_read, do_write;
+    private:
+        struct timeval tv_start, tv_last;
+        struct timeval tv_diff(const struct timeval& tv1, const struct timeval& tv2);
+        void timestamp(const std::string& message);
+};
 
-struct timeval tv_diff(const struct timeval& tv1, const struct timeval& tv2)
+struct timeval Benchmark::tv_diff(const struct timeval& tv1, const struct timeval& tv2)
 {
     struct timeval res;
 
@@ -68,10 +85,9 @@ std::ostream& operator<<(std::ostream& os, struct timeval& tv)
     return os << tv.tv_sec << "." << std::setw(6) << std::setfill('0') << tv.tv_usec;
 }
 
-static void timestamp(const std::string& message)
+void Benchmark::timestamp(const std::string& message)
 {
     struct timeval tv, tv_step, tv_elapsed;
-    static struct timeval tv_last;
 
     gettimeofday(&tv, NULL);
     tv_elapsed = tv_diff(tv_start, tv);
@@ -85,45 +101,10 @@ static void timestamp(const std::string& message)
     tv_last = tv;
 }
 
-int main(int argc, char **argv)
+
+void Benchmark::c_api_bench()
 {
     int i;
-    bool do_read = true, do_write = true;
-
-    static struct option long_opts[] = {
-        { "help", no_argument, 0, 'h' },
-        { "directory", required_argument, 0, 'd' },
-        { "write", no_argument, 0, 'w' },
-        { "read", no_argument, 0, 'r' }
-    };
-
-    int c = 0;
-    while (c >= 0) {
-        c = getopt_long(argc, argv, "hd:rw", long_opts, 0);
-
-        switch (c) {
-        case 'h':
-            std::cout << help_text;
-            return 0;
-        case 'd':
-            fty_shm_set_test_dir(optarg);
-            break;
-        case 'r':
-            do_write = false;
-            break;
-        case 'w':
-            do_read = false;
-            break;
-        case '?':
-            std::cerr << help_text;
-            return 1;
-        default:
-            // Should not happen
-            c = -1;
-        }
-    }
-
-    gettimeofday(&tv_start, NULL);
     char *names = new char[NUM_METRICS * METRIC_LEN];
     char *values = new char[NUM_METRICS * VALUE_LEN];
     char **res_values = new char*[NUM_METRICS * sizeof(char *)];
@@ -155,6 +136,104 @@ int main(int argc, char **argv)
     }
     delete[](res_values);
     delete[](res_units);
+}
+
+void Benchmark::cpp_api_bench()
+{
+    std::vector<std::string> names, values;
+    int i;
+
+    names.reserve(NUM_METRICS);
+    values.reserve(NUM_METRICS);
+    for (i = 0; i < NUM_METRICS; i++) {
+        char buf[METRIC_LEN];
+        sprintf(buf, METRIC_FMT, i);
+        names.push_back(buf);
+        sprintf(buf, VALUE_FMT, i);
+        values.push_back(buf);
+    }
+    timestamp("setup");
+    if (do_write) {
+        for (i = 0; i < NUM_METRICS; i++)
+            fty::shm::write_metric("bench_asset", names[i], values[i],
+                    "unit", 300);
+        timestamp("writes");
+    }
+    if (do_read) {
+        std::string res_value, res_unit;
+        for (i = 0; i < NUM_METRICS; i++)
+            fty::shm::read_metric("bench_asset", names[i], res_value, res_unit);
+        timestamp("reads");
+    }
+}
+
+struct BenchmarkDesc {
+    Benchmark::benchmark_fn func;
+    const char* desc;
+};
+
+std::map<std::string, BenchmarkDesc> benchmarks = {
+    { "c", { &Benchmark::c_api_bench, "Benchmark fty_shm_{read,write}_metric" } },
+    { "cpp", { &Benchmark::cpp_api_bench, "Benchmark fty::shm::{read,write}_metric" } }
+};
+
+int main(int argc, char **argv)
+{
+    Benchmark benchmark;
+    Benchmark::benchmark_fn func = &Benchmark::c_api_bench;
+
+    static struct option long_opts[] = {
+        { "help", no_argument, 0, 'h' },
+        { "directory", required_argument, 0, 'd' },
+        { "write", no_argument, 0, 'w' },
+        { "read", no_argument, 0, 'r' },
+        { "benchmark", required_argument, 0, 'b' }
+    };
+
+    int c = 0;
+    while (c >= 0) {
+        c = getopt_long(argc, argv, "hd:rwb:", long_opts, 0);
+
+        switch (c) {
+        case 'h':
+            std::cout << help_text;
+            return 0;
+        case 'd':
+            fty_shm_set_test_dir(optarg);
+            break;
+        case 'r':
+            benchmark.do_write = false;
+            break;
+        case 'w':
+            benchmark.do_read = false;
+            break;
+        case 'b':
+            {
+                if (strcmp(optarg, "help") == 0) {
+                    std::cout << "Valid options are: " << std::endl;
+                    for (auto b : benchmarks)
+                        std::cout << b.first << " - " << b.second.desc << std::endl;
+                    return 0;
+                }
+                auto it = benchmarks.find(optarg);
+                if (it == benchmarks.end()) {
+                    std::cerr << "Unknown benchmark: " << optarg << std::endl;
+                    std::cerr << "Use -b help for a list of possible benchmark names" << std::endl;
+                    return 1;
+                }
+                func = it->second.func;
+                break;
+            }
+        case '?':
+            std::cerr << help_text;
+            return 1;
+        default:
+            // Should not happen
+            c = -1;
+        }
+    }
+
+    (benchmark.*func)();
 
     return 0;
 }
