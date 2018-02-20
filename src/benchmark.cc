@@ -28,6 +28,7 @@
 
 #include <fty_shm.h>
 #include <getopt.h>
+#include <iomanip>
 #include <iostream>
 #include <sys/time.h>
 
@@ -46,21 +47,41 @@ static const char help_text[]
 #define VALUE_LEN 10
 #define VALUE_FMT "v%08d"
 
-static void timestamp(void)
+struct timeval tv_start;
+
+struct timeval tv_diff(const struct timeval& tv1, const struct timeval& tv2)
 {
-    struct timeval tv, tv_diff;
+    struct timeval res;
+
+    if (tv2.tv_usec < tv1.tv_usec) {
+        res.tv_usec = tv2.tv_usec - tv1.tv_usec + 1000000;
+        res.tv_sec = tv2.tv_sec - tv1.tv_sec - 1;
+    } else {
+        res.tv_usec = tv2.tv_usec - tv1.tv_usec;
+        res.tv_sec = tv2.tv_sec - tv1.tv_sec;
+    }
+    return res;
+}
+
+std::ostream& operator<<(std::ostream& os, struct timeval& tv)
+{
+    return os << tv.tv_sec << "." << std::setw(6) << std::setfill('0') << tv.tv_usec;
+}
+
+static void timestamp(const std::string& message)
+{
+    struct timeval tv, tv_step, tv_elapsed;
     static struct timeval tv_last;
 
     gettimeofday(&tv, NULL);
-    if (tv.tv_usec < tv_last.tv_usec) {
-        tv_diff.tv_usec = tv.tv_usec - tv_last.tv_usec + 1000000;
-        tv_diff.tv_sec = tv.tv_sec - tv_last.tv_sec - 1;
-    } else {
-        tv_diff.tv_usec = tv.tv_usec - tv_last.tv_usec;
-        tv_diff.tv_sec = tv.tv_sec - tv_last.tv_sec;
+    tv_elapsed = tv_diff(tv_start, tv);
+    std::cout << std::setfill(' ') << std::setw(8) << message <<
+        ": " << tv_elapsed;
+    if (tv_last.tv_sec) {
+        tv_step = tv_diff(tv_last, tv);
+        std::cout << " +" << tv_step;
     }
-    printf("%ld.%06ld + %ld.%06ld\n", tv.tv_sec, tv.tv_usec,
-            tv_diff.tv_sec, tv_diff.tv_usec);
+    std::cout << std::endl;
     tv_last = tv;
 }
 
@@ -102,7 +123,7 @@ int main(int argc, char **argv)
         }
     }
 
-    timestamp();
+    gettimeofday(&tv_start, NULL);
     char *names = new char[NUM_METRICS * METRIC_LEN];
     char *values = new char[NUM_METRICS * VALUE_LEN];
     char **res_values = new char*[NUM_METRICS * sizeof(char *)];
@@ -112,18 +133,18 @@ int main(int argc, char **argv)
         sprintf(names + i * METRIC_LEN, METRIC_FMT, i);
         sprintf(values + i * VALUE_LEN, VALUE_FMT, i);
     }
-    timestamp();
+    timestamp("setup");
     if (do_write) {
         for (i = 0; i < NUM_METRICS; i++)
             fty_shm_write_metric("bench_asset", names + i * METRIC_LEN,
                     values + i * METRIC_LEN, "unit", 300);
-        timestamp();
+        timestamp("writes");
     }
     if (do_read) {
         for (i = 0; i < NUM_METRICS; i++)
             fty_shm_read_metric("bench_asset", names + i * METRIC_LEN,
                     &res_values[i], &res_units[i]);
-        timestamp();
+        timestamp("reads");
     }
 
     delete[](names);
