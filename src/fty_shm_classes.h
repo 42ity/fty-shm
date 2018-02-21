@@ -44,7 +44,7 @@
 
 //  Self test for private classes
 FTY_SHM_PRIVATE void
-    fty_shm_private_selftest (bool verbose);
+    fty_shm_private_selftest (bool verbose, const char *subtest);
 
 #endif // FTY_SHM_BUILD_DRAFT_API
 

@@ -81,7 +81,7 @@ typedef struct _fty_shm_t fty_shm_t;
 #ifdef FTY_SHM_BUILD_DRAFT_API
 //  Self test for private classes
 FTY_SHM_EXPORT void
-    fty_shm_private_selftest (bool verbose);
+    fty_shm_private_selftest (bool verbose, const char *subtest);
 #endif // FTY_SHM_BUILD_DRAFT_API
 
 #endif

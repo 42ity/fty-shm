@@ -1,5 +1,0 @@
-# zproject adds our header to the list twice, work around it here
-
-include_HEADERS = \
-    include/fty_shm.h \
-    include/fty_shm_library.h

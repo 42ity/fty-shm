@@ -16,6 +16,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 # Select flags
 SET(CMAKE_C_FLAGS_RELEASE "-O3")
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/builds/cmake/Modules)
+
 # Will be used to add flags to pkg-config useful when apps want to statically link
 set(pkg_config_libs_private "")
 
@@ -186,8 +188,8 @@ endif()
 IF (NOT MSVC)
   # avoid building everything twice for shared + static
   # only on *nix, as Windows needs different preprocessor defines in static builds
-  add_library (objects OBJECT ${fty_shm_sources})
-  set_property(TARGET objects PROPERTY POSITION_INDEPENDENT_CODE ON)
+  add_library (fty_shm_objects OBJECT ${fty_shm_sources})
+  set_property(TARGET fty_shm_objects PROPERTY POSITION_INDEPENDENT_CODE ON)
 ENDIF (NOT MSVC)
 
 # shared
@@ -195,7 +197,7 @@ if (FTY_SHM_BUILD_SHARED)
   IF (MSVC)
     add_library(fty_shm SHARED ${fty_shm_sources})
   ELSE (MSVC)
-    add_library(fty_shm SHARED $<TARGET_OBJECTS:objects>)
+    add_library(fty_shm SHARED $<TARGET_OBJECTS:fty_shm_objects>)
   ENDIF (MSVC)
 
   set_target_properties (fty_shm PROPERTIES
@@ -228,7 +230,7 @@ if (FTY_SHM_BUILD_STATIC)
   IF (MSVC)
     add_library(fty_shm-static STATIC ${fty_shm_sources})
   ELSE (MSVC)
-    add_library(fty_shm-static STATIC $<TARGET_OBJECTS:objects>)
+    add_library(fty_shm-static STATIC $<TARGET_OBJECTS:fty_shm_objects>)
   ENDIF (MSVC)
 
   set_target_properties(fty_shm-static PROPERTIES
@@ -440,6 +442,8 @@ add_custom_command(
     ARGS    -rf CMakeTmp ${cmake_generated}
     TARGET  distclean
 )
+
+include(ClangFormat)
 
 ########################################################################
 # summary
