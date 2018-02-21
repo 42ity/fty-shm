@@ -16,12 +16,10 @@ AM_CXXFLAGS = \
     -std=c++11
 
 AM_CPPFLAGS = \
-    ${libzmq_CFLAGS} \
-    ${czmq_CFLAGS} \
     -D__STDC_FORMAT_MACROS \
     -I$(srcdir)/include
 
-project_libs = ${libzmq_LIBS} ${czmq_LIBS}
+project_libs =
 
 SUBDIRS = doc
 SUBDIRS += include
@@ -42,8 +40,6 @@ DISTCLEANFILES =
 
 if ENABLE_DIST_CMAKEFILES
 EXTRA_DIST += \
-    Findlibzmq.cmake \
-    Findczmq.cmake \
     CMakeLists.txt
 endif
 

@@ -51,8 +51,6 @@ BuildRequires:  systemd
 %{?systemd_requires}
 BuildRequires:  xmlto
 BuildRequires:  gcc-c++
-BuildRequires:  zeromq-devel
-BuildRequires:  czmq-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
@@ -76,8 +74,6 @@ This package contains shared library for fty-shm: lockless metric sharing librar
 Summary:        lockless metric sharing library for 42ity
 Group:          System/Libraries
 Requires:       libfty_shm0 = %{version}
-Requires:       zeromq-devel
-Requires:       czmq-devel
 
 %description devel
 lockless metric sharing library for 42ity development tools

@@ -28,6 +28,8 @@
 
 #include <getopt.h>
 #include <iostream>
+#include <string.h>
+#include <unistd.h>
 
 #include "fty_shm.h"
 #include "internal.h"
@@ -77,11 +79,11 @@ int main(int argc, char* argv[])
     }
     //  Insert main code here
     if (verbose)
-        zsys_info("fty_shm_cleanup - Garbage collector for fty-shm");
+        std::cout << "fty_shm_cleanup - Garbage collector for fty-shm" << std::endl;
 
     while (true) {
         if (fty_shm_cleanup(verbose) < 0)
-            zsys_warning("fty-shm cleanup returned error: %s", strerror(errno));
+            std::cerr << "fty-shm cleanup returned error: " << strerror(errno) << std::endl;
         if (single)
             break;
 	// Use a prime to reduce the likelihood that the cleanup keeps running

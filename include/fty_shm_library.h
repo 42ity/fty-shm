@@ -30,7 +30,6 @@
 //  Set up environment for the application
 
 //  External dependencies
-#include <czmq.h>
 
 //  FTY_SHM version macros for compile-time API detection
 #define FTY_SHM_VERSION_MAJOR 1

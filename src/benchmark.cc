@@ -30,6 +30,7 @@
 #include <getopt.h>
 #include <iomanip>
 #include <iostream>
+#include <string.h>
 #include <sys/time.h>
 #include <map>
 

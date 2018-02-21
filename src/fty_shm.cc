@@ -27,11 +27,16 @@
 */
 
 #include <algorithm>
+#include <assert.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <linux/fs.h>
 #include <random>
+#include <string.h>
 #include <sys/syscall.h>
+#include <sys/stat.h>
+#include <sys/uio.h>
 #include <unistd.h>
 #include <unordered_set>
 
@@ -53,6 +58,10 @@
 #define UNIT_LEN 11
 
 #define HEADER_LEN (TTL_LEN + UNIT_LEN)
+
+// Convenience macros
+#define streq(s1, s2) (strcmp((s1), (s2)) == 0)
+#define FREE(x) (free(x), (x) = NULL)
 
 // This is only changed by the selftest code
 static const char* shm_dir = DEFAULT_SHM_DIR;
@@ -654,14 +663,14 @@ void fty_shm_test(bool verbose)
     check_err(fty_shm_read_metric(asset1, metric1, &value, &unit));
     assert(value);
     assert(streq(value, value1));
-    zstr_free(&value);
+    FREE(value);
     assert(unit);
     assert(streq(unit, unit1));
-    zstr_free(&unit);
+    FREE(unit);
     check_err(fty_shm_read_metric(asset1, metric1, &value, NULL));
     assert(value);
     assert(streq(value, value1));
-    zstr_free(&value);
+    FREE(value);
 
     // Update a metric (C++)
     check_err(fty::shm::write_metric(asset1, metric1, value2, unit2, 0));
@@ -708,10 +717,10 @@ void fty_shm_test(bool verbose)
     check_err(fty_shm_read_metric(asset2, metric1, &value, &unit));
     assert(value);
     assert(streq(value, value2));
-    zstr_free(&value);
+    FREE(value);
     assert(unit);
     assert(streq(unit, unit2));
-    zstr_free(&unit);
+    FREE(unit);
 
     // TTL expired
     check_err(fty_shm_write_metric(asset1, metric1, value2, unit2, 1));

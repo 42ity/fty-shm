@@ -16,9 +16,6 @@
     <version major = "1" minor = "0" patch = "0" />
     <abi current = "0" revision = "0" age = "0" />
 
-    <use project = "czmq"
-        repository="https://github.com/42ity/czmq.git" release = "v3.0.2"
-        min_major = "3" min_minor = "0" min_patch = "2" />
 		<class name = "fty_shm" state = "stable">FTY metric sharing functions</class>
 		<extra name = "internal.h" />
 		<main name = "fty-shm-cleanup" service = "1" >

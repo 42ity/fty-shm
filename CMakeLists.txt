@@ -114,30 +114,6 @@ list(APPEND CMAKE_MODULE_PATH "${SOURCE_DIR}")
 set(OPTIONAL_LIBRARIES)
 
 ########################################################################
-# LIBZMQ dependency
-########################################################################
-find_package(libzmq REQUIRED)
-IF (LIBZMQ_FOUND)
-    include_directories(${LIBZMQ_INCLUDE_DIRS})
-    list(APPEND MORE_LIBRARIES ${LIBZMQ_LIBRARIES})
-    set(pkg_config_libs_private "${pkg_config_libs_private} -lzmq")
-ELSE (LIBZMQ_FOUND)
-    message( FATAL_ERROR "libzmq not found." )
-ENDIF (LIBZMQ_FOUND)
-
-########################################################################
-# CZMQ dependency
-########################################################################
-find_package(czmq REQUIRED)
-IF (CZMQ_FOUND)
-    include_directories(${CZMQ_INCLUDE_DIRS})
-    list(APPEND MORE_LIBRARIES ${CZMQ_LIBRARIES})
-    set(pkg_config_libs_private "${pkg_config_libs_private} -lczmq")
-ELSE (CZMQ_FOUND)
-    message( FATAL_ERROR "czmq not found." )
-ENDIF (CZMQ_FOUND)
-
-########################################################################
 # version
 ########################################################################
 set(FTY_SHM_VERSION_MAJOR 1)
@@ -295,8 +271,6 @@ if (TARGET fty_shm)
 target_link_libraries(
     fty-shm-cleanup
     fty_shm
-    ${LIBZMQ_LIBRARIES}
-    ${CZMQ_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
 endif()
@@ -304,8 +278,6 @@ if (NOT TARGET fty_shm AND TARGET fty_shm-static)
 target_link_libraries(
     fty-shm-cleanup
     fty_shm-static
-    ${LIBZMQ_LIBRARIES}
-    ${CZMQ_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
 endif()
@@ -320,8 +292,6 @@ if (TARGET fty_shm)
 target_link_libraries(
     benchmark
     fty_shm
-    ${LIBZMQ_LIBRARIES}
-    ${CZMQ_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
 endif()
@@ -329,8 +299,6 @@ if (NOT TARGET fty_shm AND TARGET fty_shm-static)
 target_link_libraries(
     benchmark
     fty_shm-static
-    ${LIBZMQ_LIBRARIES}
-    ${CZMQ_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
 endif()
@@ -342,8 +310,6 @@ if (TARGET fty_shm)
 target_link_libraries(
     fty_shm_selftest
     fty_shm
-    ${LIBZMQ_LIBRARIES}
-    ${CZMQ_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
 endif()
@@ -351,8 +317,6 @@ if (NOT TARGET fty_shm AND TARGET fty_shm-static)
 target_link_libraries(
     fty_shm_selftest
     fty_shm-static
-    ${LIBZMQ_LIBRARIES}
-    ${CZMQ_LIBRARIES}
     ${OPTIONAL_LIBRARIES}
 )
 endif()
