@@ -501,6 +501,16 @@ int fty_shm_cleanup(bool verbose)
     return err;
 }
 
+int fty::shm::write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl)
+{
+    char filename[PATH_MAX];
+    std::string dummy;
+
+    if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length()) < 0)
+        return -1;
+    return write_value(filename, value.c_str(), unit.c_str(), ttl);
+}
+
 int fty::shm::read_metric(const std::string& asset, const std::string& metric, std::string& value)
 {
     char filename[PATH_MAX];

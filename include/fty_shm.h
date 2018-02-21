@@ -73,14 +73,11 @@ namespace shm {
     };
     typedef std::unordered_map<std::string, Metric> Metrics;
 
-    // C++ wrappers for fty_shm_write_metric()
-    inline int write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl)
-    {
-        return fty_shm_write_metric(asset.c_str(), metric.c_str(), value.c_str(), unit.c_str(), ttl);
-    }
+    // C++ versions of fty_shm_write_metric()
+    int write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
     inline int write_metric(const std::string& asset, const std::string& metric, const Metric& value, int ttl)
     {
-        return fty_shm_write_metric(asset.c_str(), metric.c_str(), value.value.c_str(), value.unit.c_str(), ttl);
+        return write_metric(asset, metric, value.value, value.unit, ttl);
     }
     inline int write_metric(const std::string& asset, const std::string& metric, double value, const std::string& unit, int ttl)
     {
