@@ -29,8 +29,16 @@
 
 #include "fty_shm_classes.h"
 
-#include <stdio.h>
+#ifndef streq
+/*
+ *  Allow projects without czmq dependency:
+ *  The generated code expects that czmq pulls in a few headers and macro
+ *  definitions. This is a minimal fix for the generated selftest file in
+ *  C++ mode.
+ */
 #include <string.h>
+#define streq(s1,s2)    (!strcmp ((s1), (s2)))
+#endif
 
 typedef struct {
     const char *testname;           // test name, can be called from command line this way
@@ -44,7 +52,7 @@ static test_item_t
 all_tests [] = {
 // Tests for stable public classes:
     { "fty_shm", fty_shm_test, true, true, NULL },
-    {0, 0, 0}          //  Sentinel
+    {NULL, NULL, 0, 0, NULL}          //  Sentinel
 };
 
 //  -------------------------------------------------------------------------
@@ -57,7 +65,7 @@ test_available (const char *testname)
 {
     test_item_t *item;
     for (item = all_tests; item->testname; item++) {
-        if (strcmp (testname, item->testname) == 0)
+        if (streq (testname, item->testname))
             return item;
     }
     return NULL;
@@ -73,12 +81,14 @@ test_runall (bool verbose)
     test_item_t *item;
     printf ("Running fty-shm selftests...\n");
     for (item = all_tests; item->testname; item++) {
-        if (strcmp (item->testname, "private_classes") == 0)
+        if (streq (item->testname, "private_classes"))
             continue;
         if (!item->subtest)
             item->test (verbose);
+#ifdef FTY_SHM_BUILD_DRAFT_API // selftest is still in draft
         else
             fty_shm_private_selftest (verbose, item->subtest);
+#endif // FTY_SHM_BUILD_DRAFT_API
     }
 
     printf ("Tests passed OK\n");
@@ -103,7 +113,7 @@ test_number (void)
     int n = 0;
     test_item_t *item;
     for (item = all_tests; item->testname; item++) {
-        if (! strcmp (item->testname, "private_classes") == 0)
+        if (! streq (item->testname, "private_classes"))
             n++;
     }
     printf ("%d\n", n);
@@ -116,8 +126,8 @@ main (int argc, char **argv)
     test_item_t *test = 0;
     int argn;
     for (argn = 1; argn < argc; argn++) {
-        if (strcmp (argv [argn], "--help") == 0
-        ||  strcmp (argv [argn], "-h") == 0) {
+        if (streq (argv [argn], "--help")
+        ||  streq (argv [argn], "-h")) {
             puts ("fty_shm_selftest.c [options] ...");
             puts ("  --verbose / -v         verbose test output");
             puts ("  --number / -n          report number of tests");
@@ -126,24 +136,24 @@ main (int argc, char **argv)
             puts ("  --continue / -c        continue on exception (on Windows)");
             return 0;
         }
-        if (strcmp (argv [argn], "--verbose") == 0
-        ||  strcmp (argv [argn], "-v") == 0)
+        if (streq (argv [argn], "--verbose")
+        ||  streq (argv [argn], "-v"))
             verbose = true;
         else
-        if (strcmp (argv [argn], "--number") == 0
-        ||  strcmp (argv [argn], "-n") == 0) {
+        if (streq (argv [argn], "--number")
+        ||  streq (argv [argn], "-n")) {
             test_number ();
             return 0;
         }
         else
-        if (strcmp (argv [argn], "--list") == 0
-        ||  strcmp (argv [argn], "-l") == 0) {
+        if (streq (argv [argn], "--list")
+        ||  streq (argv [argn], "-l")) {
             test_list ();
             return 0;
         }
         else
-        if (strcmp (argv [argn], "--test") == 0
-        ||  strcmp (argv [argn], "-t") == 0) {
+        if (streq (argv [argn], "--test")
+        ||  streq (argv [argn], "-t")) {
             argn++;
             if (argn >= argc) {
                 fprintf (stderr, "--test needs an argument\n");
@@ -156,8 +166,8 @@ main (int argc, char **argv)
             }
         }
         else
-        if (strcmp (argv [argn], "--continue") == 0
-        ||  strcmp (argv [argn], "-c") == 0) {
+        if (streq (argv [argn], "--continue")
+        ||  streq (argv [argn], "-c")) {
 #ifdef _MSC_VER
             //  When receiving an abort signal, only print to stderr (no dialog)
             _set_abort_behavior (0, _WRITE_ABORT_MSG);
@@ -178,8 +188,10 @@ main (int argc, char **argv)
         printf ("Running fty-shm test '%s'...\n", test->testname);
         if (!test->subtest)
             test->test (verbose);
+#ifdef FTY_SHM_BUILD_DRAFT_API // selftest is still in draft
         else
             fty_shm_private_selftest (verbose, test->subtest);
+#endif // FTY_SHM_BUILD_DRAFT_API
     }
     else
         test_runall (verbose);

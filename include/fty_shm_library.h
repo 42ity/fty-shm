@@ -60,11 +60,12 @@
 #   define FTY_SHM_EXPORT
 #   define FTY_SHM_PRIVATE
 #else
-#   define FTY_SHM_EXPORT
 #   if (defined __GNUC__ && __GNUC__ >= 4) || defined __INTEL_COMPILER
 #       define FTY_SHM_PRIVATE __attribute__ ((visibility ("hidden")))
+#       define FTY_SHM_EXPORT __attribute__ ((visibility ("default")))
 #   else
 #       define FTY_SHM_PRIVATE
+#       define FTY_SHM_EXPORT
 #   endif
 #endif
 
@@ -78,9 +79,18 @@ typedef struct _fty_shm_t fty_shm_t;
 #include "fty_shm.h"
 
 #ifdef FTY_SHM_BUILD_DRAFT_API
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 //  Self test for private classes
 FTY_SHM_EXPORT void
     fty_shm_private_selftest (bool verbose, const char *subtest);
+
+#ifdef __cplusplus
+}
+#endif
 #endif // FTY_SHM_BUILD_DRAFT_API
 
 #endif
