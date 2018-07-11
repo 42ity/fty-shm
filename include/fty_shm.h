@@ -83,6 +83,10 @@ namespace shm {
     {
         return write_metric(asset, metric, std::to_string(value), unit, ttl);
     }
+    inline int write_metric(const std::string& asset, const std::string& metric, int value, const std::string& unit, int ttl)
+    {
+        return write_metric(asset, metric, std::to_string(value), unit, ttl);
+    }
 
     // C++ version of fty_shm_read_metric()
     int read_metric(const std::string& asset, const std::string& metric, std::string& value);
