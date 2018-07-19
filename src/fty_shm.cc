@@ -43,7 +43,7 @@
 #include "fty_shm.h"
 #include "internal.h"
 
-#define DEFAULT_SHM_DIR "/var/run/fty-shm-1"
+#define DEFAULT_SHM_DIR "/run/fty-shm-1"
 #define METRIC_SUFFIX ".metric"
 #define SUFFIX_LEN (sizeof(METRIC_SUFFIX) - 1)
 
