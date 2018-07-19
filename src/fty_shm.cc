@@ -58,6 +58,7 @@
 #define UNIT_LEN 11
 
 #define HEADER_LEN (TTL_LEN + UNIT_LEN)
+#define PAYLOAD_LEN (128 - HEADER_LEN)
 
 // Convenience macros
 #define streq(s1, s2) (strcmp((s1), (s2)) == 0)
@@ -89,33 +90,6 @@ static int prepare_filename(char* buf, const char* asset, size_t a_len, const ch
     p += m_len;
     memcpy(p, METRIC_SUFFIX, sizeof(METRIC_SUFFIX));
     return 0;
-}
-
-// XXX: May modify iov
-static ssize_t write_vec(int fd, struct iovec* iov, int iovcnt)
-{
-    size_t written = 0, step;
-    ssize_t ret;
-
-    while (iovcnt > 0) {
-        if ((ret = writev(fd, iov, iovcnt)) < 0) {
-            if (errno == EINTR)
-                continue;
-            return -1;
-        }
-        step = ret;
-        written += step;
-        while (step && step >= iov[0].iov_len) {
-            step -= iov[0].iov_len;
-            iov++;
-            iovcnt--;
-        }
-        if (step > 0) {
-            iov[0].iov_len -= step;
-            iov[0].iov_base = static_cast<char *>(iov[0].iov_base) + step;
-        }
-    }
-    return written;
 }
 
 // XXX: May modify iov
@@ -154,68 +128,32 @@ static ssize_t read_buf(int fd, char* buf, size_t len)
     return read_vec(fd, &iov, 1);
 }
 
-// We need to create files according to the umask
-static int create_temp(char *buf)
-{
-    // 2**6 == 64 letters
-    static const char letters[] = "0123456789_-"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz";
-    // The seed is not of exceptional quality (ASLR-ed stack address XOR time),
-    // but since the storage directory is protected by filesystem permissions,
-    // we do not need particularly strong randomness.
-    int num, fd;
-    thread_local static std::minstd_rand rnd(reinterpret_cast<long>(&num) >> 4 ^ time(NULL));
-    char *p;
-
-    strcpy(buf, shm_dir);
-    p = buf + strlen(shm_dir);
-    *p++ = '/';
-    for (int attempt = 0; attempt < 100000; ++attempt) {
-        int i;
-        num = rnd();
-        for (i = 0; i < 4; ++i) {
-            p[i] = letters[num & 63];
-            num >>= 6;
-        }
-        p[i] = '\0';
-        fd = open(buf, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666);
-        if (fd >= 0 || errno != EEXIST)
-            return fd;
-    }
-    return fd;
-}
-
-// Write ttl and value to filename.tmp and atomically replace filename
+// Write ttl and value to filename
 static int write_value(const char* filename, const char* value, const char* unit, int ttl)
 {
     int fd;
-    char header[HEADER_LEN + 1], tmp[PATH_MAX];
-    struct iovec iov[2];
+    char buf[HEADER_LEN + PAYLOAD_LEN];
+    size_t value_len;
+    int err = 0;
 
-    if ((fd = create_temp(tmp)) < 0)
+    value_len = strlen(value);
+    if (value_len > PAYLOAD_LEN) {
+        errno = EINVAL;
+        return -1;
+    }
+    if ((fd = open(filename, O_CREAT | O_RDWR | O_CLOEXEC, 0666)) < 0)
         return -1;
     if (ttl < 0)
         ttl = 0;
-    snprintf(header, TTL_LEN + 1, TTL_FMT, ttl);
-    snprintf(header + TTL_LEN, UNIT_LEN + 1, UNIT_FMT, unit);
-    iov[0].iov_base = header;
-    iov[0].iov_len = HEADER_LEN;
-    iov[1].iov_base = const_cast<char*>(value);
-    iov[1].iov_len = strlen(value);
-    if (write_vec(fd, iov, 2) < 0) {
-        close(fd);
-        goto out_unlink;
-    }
+    sprintf(buf, TTL_FMT, ttl);
+    sprintf(buf + TTL_LEN, UNIT_FMT, unit);
+    memcpy(buf + HEADER_LEN, value, value_len);
+    memset(buf + HEADER_LEN + value_len, 0, sizeof(buf) - HEADER_LEN - value_len);
+    if (pwrite(fd, buf, sizeof(buf), 0) < 0)
+        err = -1;
     if (close(fd) < 0)
-        goto out_unlink;
-    if (rename(tmp, filename) < 0)
-        goto out_unlink;
-    return 0;
-
-out_unlink:
-    unlink(tmp);
-    return -1;
+        err = -1;
+    return err;
 }
 
 static bool alloc_str(char*& str, size_t len)
@@ -287,7 +225,6 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
 {
     int fd;
     struct stat st;
-    size_t size;
     T value_buf = T(), unit_buf = T();
     char unit_dummy[UNIT_LEN];
     char ttl_str[TTL_LEN];
@@ -315,11 +252,10 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
     }
     iov[1].iov_len = TTL_LEN;
 
-    size = st.st_size - HEADER_LEN;
-    if (!alloc_str(value_buf, size))
+    if (!alloc_str(value_buf, PAYLOAD_LEN))
         goto out_unit;
     iov[2].iov_base = str_buf(value_buf);
-    iov[2].iov_len = size;
+    iov[2].iov_len = PAYLOAD_LEN;
     if (read_vec(fd, iov, 3) < 0)
         goto out_value;
 
@@ -339,6 +275,8 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
             --i;
         trim_str(unit_buf, i + 1);
     }
+    // Trim padding NUL bytes
+    trim_str(value_buf, strlen(str_buf(value_buf)));
     value = value_buf;
     if (need_unit)
         unit = unit_buf;
