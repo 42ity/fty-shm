@@ -277,9 +277,9 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
     }
     // Trim padding NUL bytes
     trim_str(value_buf, strlen(str_buf(value_buf)));
-    value = value_buf;
+    value = std::move(value_buf);
     if (need_unit)
-        unit = unit_buf;
+        unit = std::move(unit_buf);
     close(fd);
     return 0;
 
