@@ -36,7 +36,6 @@
 #include <string.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>
-#include <sys/uio.h>
 #include <unistd.h>
 #include <unordered_set>
 
@@ -92,40 +91,15 @@ static int prepare_filename(char* buf, const char* asset, size_t a_len, const ch
     return 0;
 }
 
-// XXX: May modify iov
-static ssize_t read_vec(int fd, struct iovec* iov, int iovcnt)
-{
-    size_t written = 0, step;
-    ssize_t ret;
-
-    while (iovcnt > 0) {
-        if ((ret = readv(fd, iov, iovcnt)) < 0) {
-            if (errno == EINTR)
-                continue;
-            return -1;
-        }
-        step = ret;
-        written += step;
-        while (step && step >= iov[0].iov_len) {
-            step -= iov[0].iov_len;
-            iov++;
-            iovcnt--;
-        }
-        if (step > 0) {
-            iov[0].iov_len -= step;
-            iov[0].iov_base = static_cast<char *>(iov[0].iov_base) + step;
-        }
-    }
-    return written;
-}
-
+// Assumes len is small enough for the read to be atomic (i.e. <= 4k)
 static ssize_t read_buf(int fd, char* buf, size_t len)
 {
-    struct iovec iov;
-
-    iov.iov_base = buf;
-    iov.iov_len = len;
-    return read_vec(fd, &iov, 1);
+    ssize_t ret = read(fd, buf, len);
+    if (ret >= 0 && static_cast<size_t>(ret) != len) {
+        errno = EIO;
+        return -1;
+    }
+    return ret;
 }
 
 // Write ttl and value to filename
@@ -156,51 +130,15 @@ static int write_value(const char* filename, const char* value, const char* unit
     return err;
 }
 
-static bool alloc_str(char*& str, size_t len)
+static char* dup_str(char *str, char*)
 {
-    str = (char*)malloc(len + 1);
-    if (!str)
-        return false;
-    str[len] = '\0';
-    return true;
+    return strdup(str);
 }
 
-static bool alloc_str(std::string& str, size_t len)
-{
-    str.resize(len);
-    return true;
-}
-
-static void free_str(char*& str)
-{
-    free(str);
-    str = NULL;
-}
-
-static void free_str(std::string& str)
-{
-    // NO-OP
-}
-
-static char* str_buf(char* str)
+// When working with std::string, we do not want to call strdup
+static char* dup_str(char *str, std::string)
 {
     return str;
-}
-
-static char* str_buf(std::string& str)
-{
-    return &str.front();
-}
-
-
-static void trim_str(char*& str, size_t len)
-{
-    str[len] = '\0';
-}
-
-static void trim_str(std::string& str, size_t len)
-{
-    str.resize(len);
 }
 
 static int parse_ttl(char* ttl_str, time_t& ttl)
@@ -225,10 +163,7 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
 {
     int fd;
     struct stat st;
-    T value_buf = T(), unit_buf = T();
-    char unit_dummy[UNIT_LEN];
-    char ttl_str[TTL_LEN];
-    struct iovec iov[3];
+    char buf[HEADER_LEN + PAYLOAD_LEN];
     time_t now, ttl;
     int ret = -1;
 
@@ -236,58 +171,31 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
         return ret;
     if (fstat(fd, &st) < 0)
         goto out_fd;
-    if (st.st_size < HEADER_LEN) {
-        errno = EIO;
-        return -1;
-    }
-    iov[0].iov_base = ttl_str;
-    iov[0].iov_len = TTL_LEN;
+    if (read_buf(fd, buf, sizeof(buf)) < 0)
+        goto out_fd;
 
-    if (need_unit) {
-        if (!alloc_str(unit_buf, UNIT_LEN))
-            goto out_fd;
-        iov[1].iov_base = str_buf(unit_buf);
-    } else {
-        iov[1].iov_base = unit_dummy;
-    }
-    iov[1].iov_len = TTL_LEN;
-
-    if (!alloc_str(value_buf, PAYLOAD_LEN))
-        goto out_unit;
-    iov[2].iov_base = str_buf(value_buf);
-    iov[2].iov_len = PAYLOAD_LEN;
-    if (read_vec(fd, iov, 3) < 0)
-        goto out_value;
-
-    if (parse_ttl(ttl_str, ttl) < 0)
-        goto out_value;
+    buf[TTL_LEN - 1] = '\0';
+    if (parse_ttl(buf, ttl) < 0)
+        goto out_fd;
     if (ttl) {
         now = time(NULL);
         if (now - st.st_mtime > ttl) {
             errno = ESTALE;
-            goto out_value;
+            goto out_fd;
         }
     }
     if (need_unit) {
+        char *unit_buf = buf + TTL_LEN;
         // Trim the padding spaces
         int i = UNIT_LEN - 1;
         while (unit_buf[i] == ' ' || unit_buf[i] == '\n')
             --i;
-        trim_str(unit_buf, i + 1);
+        unit_buf[i + 1] = '\0';
+        unit = dup_str(unit_buf, T());
     }
-    // Trim padding NUL bytes
-    trim_str(value_buf, strlen(str_buf(value_buf)));
-    value = std::move(value_buf);
-    if (need_unit)
-        unit = std::move(unit_buf);
-    close(fd);
-    return 0;
+    value = dup_str(buf + HEADER_LEN, T());
+    ret = 0;
 
-out_value:
-    free_str(value_buf);
-out_unit:
-    if (need_unit)
-        free_str(unit_buf);
 out_fd:
     close(fd);
     return ret;
