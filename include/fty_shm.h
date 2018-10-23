@@ -39,6 +39,8 @@ extern "C" {
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
 int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl);
 
+int fty_shm_write_nut_metric(const char* asset, const char* metric, const char* value, int ttl);
+
 // Retrieve a metric from shm. Caller must free the returned values.
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
 int fty_shm_read_metric(const char* asset, const char* metric, char** value, char** unit);
@@ -51,6 +53,8 @@ int fty_shm_delete_asset(const char* asset);
 int fty_shm_set_test_dir(const char* dir);
 
 void fty_shm_test(bool verbose);
+
+void init_default_dir();
 
 #ifdef __cplusplus
 }
@@ -65,6 +69,27 @@ void fty_shm_test(bool verbose);
 
 namespace fty {
 namespace shm {
+    class ShmMetric {
+        public :
+            ShmMetric(std::string family, std::string asset, std::string type, std::string value, std::string unit, long int timestamp, long int ttl);
+            ShmMetric(std::string value, std::string unit, long int timestamp, long int ttl);
+            void updateMetric(std::string family, std::string asset, std::string type);
+            const std::string getFamily() { return m_family; }
+            const std::string getType() { return m_type; }
+            const std::string getAsset() { return m_asset; }
+            const std::string getValue() { return m_value; }
+            const std::string getUnit() { return m_unit; }
+            const long int getTimestamp() { return m_timestamp; }
+            const long int getTtl() { return m_ttl; }
+        private :
+            std::string m_family;
+            std::string m_type;
+            std::string m_asset;
+            std::string m_value;
+            std::string m_unit;
+            long int m_timestamp;
+            long int m_ttl;
+    };
 
     typedef std::vector<std::string> Assets;
     struct Metric {
@@ -72,6 +97,8 @@ namespace shm {
         std::string unit;
     };
     typedef std::unordered_map<std::string, Metric> Metrics;
+    
+    int write_nut_metric(std::string asset, std::string metric, std::string value, int ttl);
 
     // C++ versions of fty_shm_write_metric()
     int write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
@@ -108,12 +135,14 @@ namespace shm {
     // accessible, returns an empty list.
     // Returns 0 on success. On error, returns -1 sets errno accordingly and leaves
     // the vector intact
-    int find_assets(Assets& assets);
+    //int find_assets(Assets& assets);
 
     // Fill the passed map with metrics stored for this asset. Returns an error
     // only if there is no valid metric for this asset.
     // Returns 0 on success. On error, returns -1 and sets errno accordingly
     int read_asset_metrics(const std::string& asset, Metrics& metrics);
+
+    int read_metrics(const std::string& familly, const std::string& asset, const std::string& type, std::vector<ShmMetric>& result);
 }
 }
 

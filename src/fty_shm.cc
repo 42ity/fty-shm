@@ -38,13 +38,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <unordered_set>
+#include <regex>
+#include <iostream>
 
 #include "fty_shm.h"
 #include "internal.h"
 
 #define DEFAULT_SHM_DIR "/run/fty-shm-1"
-#define METRIC_SUFFIX ".metric"
-#define SUFFIX_LEN (sizeof(METRIC_SUFFIX) - 1)
+
+#define SEPARATOR '@'
+#define SEPARATOR_LEN 1
 
 // The first 11 bytes of each file are the ttl in 10 decimal digits, followed
 // by \n.  This is a compromise between machine and human readability
@@ -67,28 +70,38 @@
 static const char* shm_dir = DEFAULT_SHM_DIR;
 static size_t shm_dir_len = strlen(DEFAULT_SHM_DIR);
 
-static int prepare_filename(char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len)
+static int prepare_filename(char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len, const char* type)
 {
-    if (a_len + strlen(":") + m_len + SUFFIX_LEN > NAME_MAX) {
+    if (m_len + SEPARATOR_LEN + a_len  > NAME_MAX) {
         errno = ENAMETOOLONG;
         return -1;
     }
-    if (memchr(asset, '/', a_len) || memchr(asset, ':', a_len) ||
-            memchr(metric, '/', m_len) || memchr(metric, ':', m_len)) {
+    if (memchr(asset, '/', a_len) || memchr(asset, SEPARATOR, a_len) ||
+            memchr(metric, '/', m_len) || memchr(metric, SEPARATOR, m_len)) {
         errno = EINVAL;
         return -1;
     }
     char* p = buf;
     memcpy(p, shm_dir, shm_dir_len);
     p += shm_dir_len;
+
     *p++ = '/';
-    memcpy(p, asset, a_len);
-    p += a_len;
-    *p++ = ':';
+    memcpy(p, type, strlen(type));
+    p += strlen(type);
+
+    *p++ = '/';
     memcpy(p, metric, m_len);
     p += m_len;
-    memcpy(p, METRIC_SUFFIX, sizeof(METRIC_SUFFIX));
+    *p++ = SEPARATOR;
+    memcpy(p, asset, a_len);
+    p += a_len;
+    *p++ = '\0';
     return 0;
+}
+
+static int prepare_filename(char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len)
+{
+  return prepare_filename(buf, asset, a_len, metric, m_len, "metric");
 }
 
 // Assumes len is small enough for the read to be atomic (i.e. <= 4k)
@@ -100,6 +113,15 @@ static ssize_t read_buf(int fd, char* buf, size_t len)
         return -1;
     }
     return ret;
+}
+
+int fty_write_nut_metric(std::string asset, std::string metric, std::string value, int ttl) {
+  return fty::shm::write_nut_metric(asset, metric, value, ttl);
+}
+
+int fty::shm::write_nut_metric(std::string asset, std::string metric, std::string value, int ttl) {
+  //TODO : convert nut metric name to fty metric name and select the right unit.
+  return write_metric(asset, metric, value, "NULL", ttl);
 }
 
 // Write ttl and value to filename
@@ -201,6 +223,47 @@ out_fd:
     return ret;
 }
 
+int read_data_metric(const char* filename, std::vector<fty::shm::ShmMetric>& metrics)
+{
+    int fd;
+    struct stat st;
+    char buf[HEADER_LEN + PAYLOAD_LEN];
+    time_t now, ttl;
+    int ret = -1;
+    char *unit_buf;
+    // Trim the padding spaces
+    int i = UNIT_LEN - 1;
+
+    if ((fd = open(filename, O_RDONLY | O_CLOEXEC)) < 0)
+        return ret;
+    if (fstat(fd, &st) < 0)
+        goto shm_out_fd;
+    if (read_buf(fd, buf, sizeof(buf)) < 0)
+        goto shm_out_fd;
+
+    buf[TTL_LEN - 1] = '\0';
+    if (parse_ttl(buf, ttl) < 0)
+        goto shm_out_fd;
+    if (ttl) {
+        now = time(NULL);
+        if (now - st.st_mtime > ttl) {
+            errno = ESTALE;
+            goto shm_out_fd;
+        }
+    }
+    unit_buf = buf + TTL_LEN;
+    while (unit_buf[i] == ' ' || unit_buf[i] == '\n')
+        --i;
+    unit_buf[i + 1] = '\0';
+
+    metrics.push_back(fty::shm::ShmMetric(buf + HEADER_LEN, unit_buf,(long int) st.st_mtim.tv_sec, (long int) ttl));
+    ret = 0;
+
+shm_out_fd:
+    close(fd);
+    return ret;
+}
+
 int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl)
 {
     char filename[PATH_MAX];
@@ -249,6 +312,63 @@ int fty_shm_delete_asset(const char* asset)
     return err;
 }
 
+
+int fty_shm_read_family(const char* family, std::string asset, std::string type, std::vector<fty::shm::ShmMetric>& result) 
+{
+  DIR* dir;
+  if(!(dir = opendir(family)))
+    return -1;
+
+  char* working_dir = (char*) malloc(250);
+  getcwd(working_dir, 250);
+  std::string family_dir = shm_dir;
+  family_dir.append("/");
+  family_dir.append(family);
+  chdir(family_dir.c_str());
+  //fchdir(dirfd(dir));
+  struct dirent* de;
+//  std::string regex = type;
+//  regex += SEPARATOR;
+//  regex.append(asset);
+  try {
+    //std::regex regfile(regex);
+    std::regex regType(type);
+    std::regex regAsset(asset);
+
+    while ((de = readdir(dir))) {
+      const char* delim = strchr(de->d_name, SEPARATOR);
+      size_t type_name = delim - de->d_name;
+      if(std::regex_match(std::string(delim+1), regAsset) && std::regex_match(std::string(de->d_name, type_name), regType)) {
+        if(read_data_metric(de->d_name, result) == 0) {
+          result.back().updateMetric(family,std::string(delim+1),std::string(de->d_name, type_name));
+        }
+      }
+    }
+  } catch(const std::regex_error& e) {
+    chdir(working_dir);
+    return -1;
+  }
+  chdir(working_dir);
+  return 0;
+}
+
+int fty::shm::read_metrics(const std::string& family, const std::string& asset, const std::string& type, std::vector<fty::shm::ShmMetric>& result)
+{
+  DIR* dir;
+  if(family == "*") {
+    struct dirent *de_root;
+    if (!(dir = opendir(shm_dir)))
+        return -1;
+    int dfd_root = dirfd(dir);
+    while ((de_root = readdir(dir))) {
+      fty_shm_read_family(de_root->d_name, asset, type, result);
+    }
+  }
+  else {
+    fty_shm_read_family(family.c_str(), asset, type, result);
+  }
+}
+
 int fty_shm_set_test_dir(const char* dir)
 {
     if (strlen(dir) > PATH_MAX - strlen("/") - NAME_MAX) {
@@ -270,87 +390,92 @@ static int rename_noreplace(int dfd, const char* src, const char* dst)
 int fty_shm_cleanup(bool verbose)
 {
     DIR* dir;
-    int dfd;
-    struct dirent* de;
+    DIR* dir_child;
+    int dfd_root, dfd;
+    struct dirent *de, *de_root;
     int err = 0;
+    std::string shm_subdir;
 
     if (!(dir = opendir(shm_dir)))
         return -1;
-    dfd = dirfd(dir);
+    dfd_root = dirfd(dir);
 
-    while ((de = readdir(dir))) {
-        int fd;
-        time_t now, ttl;
-        struct stat st1, st2;
-        size_t len = strlen(de->d_name);
-        char ttl_str[TTL_LEN];
+    while ((de_root = readdir(dir))) {
+      shm_subdir = shm_dir;
+      shm_subdir.append("/");
+      shm_subdir.append(de_root->d_name);
+      if(!(dir_child = opendir(shm_subdir.c_str())))
+        continue;
+      dfd = dirfd(dir_child);
+      while ((de = readdir(dir_child))) {
+          int fd;
+          time_t now, ttl;
+          struct stat st1, st2;
+          size_t len = strlen(de->d_name);
+          char ttl_str[TTL_LEN];
 
-        if (len < SUFFIX_LEN)
-            // Malformed filename
-            continue;
-        if (strncmp(de->d_name + len - SUFFIX_LEN, METRIC_SUFFIX, SUFFIX_LEN) != 0)
-            // Not a metric
-            continue;
-        if ((fd = openat(dfd, de->d_name, O_RDONLY | O_CLOEXEC)) < 0) {
-            err = -1;
-            continue;
-        }
-        if (fstat(fd, &st1) < 0) {
-            err = -1;
-            close(fd);
-            continue;
-        }
-        if (st1.st_size < HEADER_LEN) {
-            // Malformed file
-            close(fd);
-            continue;
-        }
-        if (read_buf(fd, ttl_str, TTL_LEN) < 0) {
-            err = -1;
-            close(fd);
-            continue;
-        }
-        close(fd);
-        if (parse_ttl(ttl_str, ttl) < 0) {
-            err = -1;
-            continue;
-        }
-        if (!ttl)
-            continue;
-        now = time(NULL);
-        // We wait for two times the ttl value before deleting the entry
-        if ((now - st1.st_mtime) / 2 <= ttl)
-            continue;
-        // We can race here, but that is not considered a problem. A
-        // metric not updated for twice the ttl time is already a bug
-        // and the effect of the race is following:
-        // 1. Metric expires
-        // 2. We check that another ttl seconds have passed
-        // 3. Metric gets updated
-        // 4. We erroneously delete the updated metric
-        // 5. We restore the updated metric
-        // i.e. the updated metric disappears briefly between 4. and 5.,
-        // while it had been gone for ttl seconds between 1. and 3.
-        if (renameat(dfd, de->d_name, dfd, ".delete") < 0) {
-            err = -1;
-            continue;
-        }
-        if (fstatat(dfd, ".delete", &st2, 0) < 0) {
-            // This should not happen
-            err = -1;
-            continue;
-        }
-        if (st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino) {
-            if (unlinkat(dfd, ".delete", 0) < 0)
-                err = -1;
-            continue;
-        }
-        // We lost the race. Restore the metric, but only if it has not
-        // been updated for the second time.
-        if (rename_noreplace(dfd, ".delete", de->d_name) < 0) {
-            unlinkat(dfd, ".delete", 0);
-            err = -1;
-        }
+          if ((fd = openat(dfd, de->d_name, O_RDONLY | O_CLOEXEC)) < 0) {
+              err = -1;
+              continue;
+          }
+          if (fstat(fd, &st1) < 0) {
+              err = -1;
+              close(fd);
+              continue;
+          }
+          if (st1.st_size < HEADER_LEN) {
+              // Malformed file
+              close(fd);
+              continue;
+          }
+          if (read_buf(fd, ttl_str, TTL_LEN) < 0) {
+              err = -1;
+              close(fd);
+              continue;
+          }
+          close(fd);
+          if (parse_ttl(ttl_str, ttl) < 0) {
+              err = -1;
+              continue;
+          }
+          if (!ttl)
+              continue;
+          now = time(NULL);
+          // We wait for two times the ttl value before deleting the entry
+          if ((now - st1.st_mtime) / 2 <= ttl)
+              continue;
+          // We can race here, but that is not considered a problem. A
+          // metric not updated for twice the ttl time is already a bug
+          // and the effect of the race is following:
+          // 1. Metric expires
+          // 2. We check that another ttl seconds have passed
+          // 3. Metric gets updated
+          // 4. We erroneously delete the updated metric
+          // 5. We restore the updated metric
+          // i.e. the updated metric disappears briefly between 4. and 5.,
+          // while it had been gone for ttl seconds between 1. and 3.
+          if (renameat(dfd, de->d_name, dfd, ".delete") < 0) {
+              err = -1;
+              continue;
+          }
+          if (fstatat(dfd, ".delete", &st2, 0) < 0) {
+              // This should not happen
+              err = -1;
+              continue;
+          }
+          if (st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino) {
+              if (unlinkat(dfd, ".delete", 0) < 0)
+                  err = -1;
+              continue;
+          }
+          // We lost the race. Restore the metric, but only if it has not
+          // been updated for the second time.
+          if (rename_noreplace(dfd, ".delete", de->d_name) < 0) {
+              unlinkat(dfd, ".delete", 0);
+              err = -1;
+          }
+      }
+      closedir(dir_child);
     }
     closedir(dir);
     return err;
@@ -385,7 +510,7 @@ int fty::shm::read_metric(const std::string& asset, const std::string& metric, s
     return read_value(filename, value, unit);
 }
 
-int fty::shm::find_assets(Assets& assets)
+/*int fty::shm::find_assets(Assets& assets)
 {
     DIR* dir;
     struct dirent* de;
@@ -408,7 +533,7 @@ int fty::shm::find_assets(Assets& assets)
     }
     closedir(dir);
     return 0;
-}
+}*/
 
 int fty::shm::read_asset_metrics(const std::string& asset, Metrics& metrics)
 {
@@ -416,26 +541,22 @@ int fty::shm::read_asset_metrics(const std::string& asset, Metrics& metrics)
     struct dirent* de;
     int err = -1;
 
-    if (!(dir = opendir(shm_dir)))
+    std::string shm_dirmetrics = shm_dir;
+    shm_dirmetrics.append("/");
+    shm_dirmetrics.append("metric");
+    if (!(dir = opendir(shm_dirmetrics.c_str())))
         return -1;
 
     metrics.clear();
     while ((de = readdir(dir))) {
-        const char* delim = strchr(de->d_name, ':');
+        const char* delim = strchr(de->d_name, SEPARATOR);
         size_t len = strlen(de->d_name);
-        if (!delim || len < SUFFIX_LEN)
-            // Malformed filename
-            continue;
-        size_t asset_len = delim - de->d_name;
-        size_t metric_len = len - asset_len - strlen(":") - SUFFIX_LEN;
-        if (strncmp(de->d_name + len - SUFFIX_LEN, METRIC_SUFFIX, SUFFIX_LEN) != 0)
-            // Not a metric
-            continue;
-        if (std::string(de->d_name, asset_len) != asset)
+        size_t metric_len = delim - de->d_name;
+        if (std::string(delim+1) != asset)
             continue;
         Metric metric;
         char filename[PATH_MAX];
-        sprintf(filename, "%s/%s", shm_dir, de->d_name);
+        sprintf(filename, "%s/%s", shm_dirmetrics.c_str(), de->d_name);
         if (read_value(filename, metric.value, metric.unit) < 0)
             continue;
         err = 0;
@@ -443,6 +564,34 @@ int fty::shm::read_asset_metrics(const std::string& asset, Metrics& metrics)
     }
     closedir(dir);
     return err;
+}
+
+fty::shm::ShmMetric::ShmMetric(std::string family, std::string asset, std::string type, std::string value, std::string unit, long int timestamp, long int ttl) {
+  m_family = family;
+  m_asset = asset;
+  m_type = type;
+  m_value = value;
+  m_unit = unit;
+  m_timestamp = timestamp;
+  m_ttl = ttl;
+}
+
+fty::shm::ShmMetric::ShmMetric(std::string value, std::string unit, long int timestamp, long int ttl) {
+  m_value = value;
+  m_unit = unit;
+  m_timestamp = timestamp;
+  m_ttl = ttl;
+}
+
+void fty::shm::ShmMetric::updateMetric(std::string family, std::string asset, std::string type) {
+  m_family = family;
+  m_asset = asset;
+  m_type = type;
+}
+
+
+void init_default_dir() {
+  chdir(DEFAULT_SHM_DIR);
 }
 
 //  --------------------------------------------------------------------------
@@ -499,9 +648,9 @@ void fty_shm_test(bool verbose)
     free(name2long);
 
     // Check that the storage is empty
-    fty::shm::Assets assets;
-    fty::shm::find_assets(assets);
-    assert(assets.size() == 0);
+    //fty::shm::Assets assets;
+    //fty::shm::find_assets(assets);
+    //assert(assets.size() == 0);
 
     // Write and read back a metric
     check_err(fty_shm_write_metric(asset1, metric1, value1, unit1, 0));
@@ -536,12 +685,12 @@ void fty_shm_test(bool verbose)
     assert(cpp_value.compare(0, 4, "42.0") == 0 || cpp_value.compare(0, 4, "41.9") == 0);
 
     // List assets
-    check_err(fty_shm_write_metric(asset1, metric2, value1, unit1, 0));
-    check_err(fty_shm_write_metric(asset2, metric1, value1, unit1, 0));
-    fty::shm::find_assets(assets);
-    assert(assets.size() == 2);
-    assert(std::find(assets.begin(), assets.end(), asset1) != assets.end());
-    assert(std::find(assets.begin(), assets.end(), asset2) != assets.end());
+    //check_err(fty_shm_write_metric(asset1, metric2, value1, unit1, 0));
+    //check_err(fty_shm_write_metric(asset2, metric1, value1, unit1, 0));
+    //fty::shm::find_assets(assets);
+    //assert(assets.size() == 2);
+    //assert(std::find(assets.begin(), assets.end(), asset1) != assets.end());
+    //assert(std::find(assets.begin(), assets.end(), asset2) != assets.end());
 
     // Load all metrics for an asset
     fty::shm::Metrics metrics;

@@ -110,7 +110,8 @@ void Benchmark::c_api_bench()
     char *values = new char[NUM_METRICS * VALUE_LEN];
     char **res_values = new char*[NUM_METRICS * sizeof(char *)];
     char **res_units = new char*[NUM_METRICS * sizeof(char *)];
-
+    std::vector<fty::shm::ShmMetric> all_metrics;
+    init_default_dir();
     for (i = 0; i < NUM_METRICS; i++) {
         sprintf(names + i * METRIC_LEN, METRIC_FMT, i);
         sprintf(values + i * VALUE_LEN, VALUE_FMT, i);
@@ -128,6 +129,9 @@ void Benchmark::c_api_bench()
                     &res_values[i], &res_units[i]);
         timestamp("reads");
     }
+  
+    fty::shm::read_metrics("metric", ".*", ".*", all_metrics);
+    timestamp("re-reads");
 
     delete[](names);
     delete[](values);
@@ -142,6 +146,7 @@ void Benchmark::c_api_bench()
 void Benchmark::cpp_api_bench()
 {
     std::vector<std::string> names, values;
+    std::vector<fty::shm::ShmMetric> all_metrics;
     int i;
 
     names.reserve(NUM_METRICS);
@@ -166,6 +171,9 @@ void Benchmark::cpp_api_bench()
             fty::shm::read_metric("bench_asset", names[i], res_value, res_unit);
         timestamp("reads");
     }
+
+    fty::shm::read_metrics("metric", ".*", ".*", all_metrics);
+    timestamp("re-reawSds");
 }
 
 struct BenchmarkDesc {
