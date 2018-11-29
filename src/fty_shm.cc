@@ -454,7 +454,6 @@ int fty_shm_cleanup(bool verbose)
           int fd;
           time_t now, ttl;
           struct stat st1, st2;
-          size_t len = strlen(de->d_name);
           char ttl_str[TTL_LEN];
 
           if ((fd = openat(dfd, de->d_name, O_RDONLY | O_CLOEXEC)) < 0) {
