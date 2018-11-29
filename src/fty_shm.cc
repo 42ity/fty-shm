@@ -40,6 +40,7 @@
 #include <unordered_set>
 #include <regex>
 #include <iostream>
+#include <map>
 
 #include "fty_shm.h"
 #include "internal.h"
@@ -61,10 +62,6 @@
 
 #define HEADER_LEN (TTL_LEN + UNIT_LEN)
 #define PAYLOAD_LEN (128 - HEADER_LEN)
-
-// Convenience macros
-#define streq(s1, s2) (strcmp((s1), (s2)) == 0)
-#define FREE(x) (free(x), (x) = NULL)
 
 // This is only changed by the selftest code
 static const char* shm_dir = DEFAULT_SHM_DIR;
@@ -169,7 +166,9 @@ static int parse_ttl(char* ttl_str, time_t& ttl)
     int res;
 
     // Delete the '\n'
-    ttl_str[TTL_LEN - 1] = '\0';
+    int len = strlen(ttl_str) -1;
+    if(ttl_str[len] == '\n')
+      ttl_str[len] = '\0';
     res = strtol(ttl_str, &err, 10);
     if (err != ttl_str + TTL_LEN - 1) {
         errno = ERANGE;
@@ -223,44 +222,79 @@ out_fd:
     return ret;
 }
 
-int read_data_metric(const char* filename, std::vector<fty::shm::ShmMetric>& metrics)
-{
-    int fd;
-    struct stat st;
-    char buf[HEADER_LEN + PAYLOAD_LEN];
-    time_t now, ttl;
-    int ret = -1;
-    char *unit_buf;
-    // Trim the padding spaces
-    int i = UNIT_LEN - 1;
+int read_data_metric(const char* filename, fty_proto_t *proto_metric) {
+  int ret = -1;
+  struct stat st;
+  FILE* file = NULL;
+  char buf[128];
+  char bufVal[128];
+  time_t now, ttl;
+  int len;
 
-    if ((fd = open(filename, O_RDONLY | O_CLOEXEC)) < 0)
-        return ret;
-    if (fstat(fd, &st) < 0)
-        goto shm_out_fd;
-    if (read_buf(fd, buf, sizeof(buf)) < 0)
-        goto shm_out_fd;
+  file = fopen(filename, "r");
+  if(file == NULL)
+    goto shm_out_fd;
+  if(fstat(fileno(file), &st) < 0)
+    goto shm_out_fd;
 
-    buf[TTL_LEN - 1] = '\0';
-    if (parse_ttl(buf, ttl) < 0)
-        goto shm_out_fd;
-    if (ttl) {
+  //get ttl
+  fgets(buf, sizeof(buf), file);
+  
+  if (parse_ttl(buf, ttl) < 0)
+    goto shm_out_fd;
+
+  //data still valid ?
+  if (ttl) {
         now = time(NULL);
         if (now - st.st_mtime > ttl) {
             errno = ESTALE;
             goto shm_out_fd;
         }
     }
-    unit_buf = buf + TTL_LEN;
-    while (unit_buf[i] == ' ' || unit_buf[i] == '\n')
-        --i;
-    unit_buf[i + 1] = '\0';
 
-    metrics.push_back(fty::shm::ShmMetric(buf + HEADER_LEN, unit_buf,(long int) st.st_mtim.tv_sec, (long int) ttl));
-    ret = 0;
+  //set ttl
+  fty_proto_set_ttl(proto_metric,ttl);
+  //set timestamp
+  fty_proto_set_time(proto_metric, st.st_mtim.tv_sec);
+
+  //get unit
+  fgets(buf, sizeof(buf), file);
+  // Delete the '\n'
+  len = strlen(buf) -1;
+  if(buf[len] == '\n')
+    buf[len] = '\0';
+  fty_proto_set_unit(proto_metric, buf);
+
+  //get value
+  fgets(buf, sizeof(buf), file);
+  // Delete the '\n'
+  len = strlen(buf) -1;
+  if(buf[len] == '\n')
+    buf[len] = '\0';
+
+  fty_proto_set_value(proto_metric, buf);
+
+  while(fgets(buf, sizeof(buf), file) != NULL) {
+    if(fgets(bufVal, sizeof(bufVal), file) == NULL) {
+      break;
+    }
+
+    // Delete the '\n'
+    len = strlen(buf) -1;
+    if(buf[len] == '\n')
+      buf[len] = '\0';
+
+    len = strlen(bufVal) -1;
+    if(bufVal[len] == '\n')
+      bufVal[len] = '\0';
+
+    fty_proto_aux_insert(proto_metric, buf, "%s", bufVal);
+  }
+  fclose(file);
+  return 0;
 
 shm_out_fd:
-    close(fd);
+    fclose(file);
     return ret;
 }
 
@@ -313,34 +347,40 @@ int fty_shm_delete_asset(const char* asset)
 }
 
 
-int fty_shm_read_family(const char* family, std::string asset, std::string type, std::vector<fty::shm::ShmMetric>& result) 
+int fty_shm_read_family(const char* family, std::string asset, std::string type, fty::shm::shmMetrics& result)
 {
-  DIR* dir;
-  if(!(dir = opendir(family)))
-    return -1;
-
   char* working_dir = (char*) malloc(250);
   getcwd(working_dir, 250);
   std::string family_dir = shm_dir;
   family_dir.append("/");
   family_dir.append(family);
+  DIR* dir;
+  if(!(dir = opendir(family_dir.c_str())))
+    return -1;
   chdir(family_dir.c_str());
   //fchdir(dirfd(dir));
   struct dirent* de;
-//  std::string regex = type;
-//  regex += SEPARATOR;
-//  regex.append(asset);
+
   try {
-    //std::regex regfile(regex);
+
     std::regex regType(type);
     std::regex regAsset(asset);
-
+    int dixfois = 0;
+    std::cout << std::endl;
     while ((de = readdir(dir))) {
       const char* delim = strchr(de->d_name, SEPARATOR);
+      //If not a valid metric
+      if(!delim)
+        continue;
       size_t type_name = delim - de->d_name;
       if(std::regex_match(std::string(delim+1), regAsset) && std::regex_match(std::string(de->d_name, type_name), regType)) {
-        if(read_data_metric(de->d_name, result) == 0) {
-          result.back().updateMetric(family,std::string(delim+1),std::string(de->d_name, type_name));
+        fty_proto_t *proto_metric = fty_proto_new(FTY_PROTO_METRIC);
+        if(read_data_metric(de->d_name, proto_metric) == 0) {
+          fty_proto_set_name(proto_metric, "%s", std::string(delim+1).c_str());
+          fty_proto_set_type(proto_metric, "%s", std::string(de->d_name, type_name).c_str());
+          result.add(proto_metric);
+        } else {
+          fty_proto_destroy(&proto_metric);
         }
       }
     }
@@ -352,7 +392,7 @@ int fty_shm_read_family(const char* family, std::string asset, std::string type,
   return 0;
 }
 
-int fty::shm::read_metrics(const std::string& family, const std::string& asset, const std::string& type, std::vector<fty::shm::ShmMetric>& result)
+int fty::shm::read_metrics(const std::string& family, const std::string& asset, const std::string& type, shmMetrics& result)
 {
   DIR* dir;
   if(family == "*") {
@@ -481,6 +521,41 @@ int fty_shm_cleanup(bool verbose)
     return err;
 }
 
+// Write ttl and value to filename
+static int write_metric_data(const char* filename, fty_proto_t* metric)
+{
+    FILE* file = fopen(filename, "w");
+    if(file == NULL)
+      return -1;
+    int ttl = fty_proto_ttl(metric);
+    if (ttl < 0)
+        ttl = 0;
+    fprintf(file, "%d\n%s\n%s", ttl, fty_proto_unit(metric), fty_proto_value(metric));
+    zhash_t *aux = fty_proto_aux(metric);
+
+    if (aux) {
+      char *item = (char *) zhash_first (aux);
+      while (item) {
+          fprintf (file, "\n%s\n%s", zhash_cursor (aux), item);
+          item = (char *) zhash_next (aux);
+      }
+    }
+    if(fclose(file) < 0)
+      return -1;
+
+    return 0;
+}
+
+
+int fty::shm::write_metric(fty_proto_t* metric)
+{
+    char filename[PATH_MAX];
+
+    if (prepare_filename(filename, fty_proto_name(metric), strlen(fty_proto_name(metric)), fty_proto_type(metric), strlen(fty_proto_type(metric))) < 0)
+        return -1;
+    return write_metric_data(filename, metric);
+}
+
 int fty::shm::write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl)
 {
     char filename[PATH_MAX];
@@ -566,29 +641,28 @@ int fty::shm::read_asset_metrics(const std::string& asset, Metrics& metrics)
     return err;
 }
 
-fty::shm::ShmMetric::ShmMetric(std::string family, std::string asset, std::string type, std::string value, std::string unit, long int timestamp, long int ttl) {
-  m_family = family;
-  m_asset = asset;
-  m_type = type;
-  m_value = value;
-  m_unit = unit;
-  m_timestamp = timestamp;
-  m_ttl = ttl;
+fty::shm::shmMetrics::~shmMetrics() {
+  for (std::vector<fty_proto_t *>::iterator i = m_metricsVector.begin(); i != m_metricsVector.end(); ++i) {
+    fty_proto_destroy(&(*i));
+  }
+  m_metricsVector.clear();
 }
 
-fty::shm::ShmMetric::ShmMetric(std::string value, std::string unit, long int timestamp, long int ttl) {
-  m_value = value;
-  m_unit = unit;
-  m_timestamp = timestamp;
-  m_ttl = ttl;
+fty_proto_t* fty::shm::shmMetrics::get(int i) {
+  return m_metricsVector.at(i);
 }
 
-void fty::shm::ShmMetric::updateMetric(std::string family, std::string asset, std::string type) {
-  m_family = family;
-  m_asset = asset;
-  m_type = type;
+fty_proto_t* fty::shm::shmMetrics::getDup(int i) {
+  return fty_proto_dup(m_metricsVector.at(i));
 }
 
+long unsigned int fty::shm::shmMetrics::size() {
+  return m_metricsVector.size();
+}
+
+void fty::shm::shmMetrics::add(fty_proto_t* metric) {
+  m_metricsVector.push_back(metric);
+}
 
 void init_default_dir() {
   chdir(DEFAULT_SHM_DIR);

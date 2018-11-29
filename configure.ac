@@ -143,6 +143,354 @@ PREVIOUS_CFLAGS="${CFLAGS}"
 PREVIOUS_LIBS="${LIBS}"
 
 
+was_libzmq_check_lib_detected=no
+
+search_libzmq="yes"
+
+AC_ARG_WITH([libzmq],
+    [
+        AS_HELP_STRING([--with-libzmq],
+        [yes or no. Optionally specify libzmq prefix (directory where its include/ and lib/ are located), but that is only used if pkgconfig metadata is not found first])
+    ],
+    [
+        search_libzmq="yes"
+    ],
+    [
+        search_libzmq="yes"
+    ])
+AS_CASE([x"${with_libzmq}"],
+    [xyes], [search_libzmq="yes"],
+    [xno],  [search_libzmq="no"])
+
+dnl We do not abort right now, because the maintainer/developer may have
+dnl something particular in mind, e.g. to build just parts of a project.
+AS_IF([test x"${search_libzmq}" = xno],
+    [AC_MSG_WARN([Required dependency on libzmq was explicitly disabled during configuration by '--with-libzmq=no'; subsequent full build of fty-shm may fail])])
+
+AS_IF([test x"${search_libzmq}" = xyes], [
+    # Archive previously detected and supplied flags
+    PRE_SEARCH_CFLAGS="${CFLAGS}"
+    PRE_SEARCH_LIBS="${LIBS}"
+
+    found_pkgconfig=""
+    PKG_CHECK_MODULES([libzmq], [libzmq >= 0.0.0],
+    [
+        PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE $libzmq_LIBS"
+        was_libzmq_check_lib_detected=pkgcfg
+        found_pkgconfig="libzmq"
+    ],
+    [
+        AC_MSG_NOTICE([Package libzmq not found; falling back to defined compilability tests])
+
+        libzmq_synthetic_cflags=""
+        libzmq_synthetic_libs="-lzmq"
+
+        if test -n "${with_libzmq}" && test x"${with_libzmq}" != xyes && test x"${with_libzmq}" != xno; then
+            if test -r "${with_libzmq}/include/zmq.h"; then
+                libzmq_synthetic_cflags="-I${with_libzmq}/include"
+                libzmq_synthetic_libs="-L${with_libzmq}/lib -lzmq"
+            else
+            AC_MSG_ERROR([Header file ${with_libzmq}/include/zmq.h was not found. Please check libzmq prefix])
+            fi
+        else
+            AC_CHECK_HEADER([zmq.h], [],
+            AC_MSG_ERROR([Header file zmq.h was not found in default search paths])
+                )
+        fi
+
+        AC_CHECK_LIB([zmq], [zmq_init],
+            [
+                was_libzmq_check_lib_detected=yes
+                PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE -lzmq"
+            ],
+            [AC_MSG_ERROR([cannot link with -lzmq, install libzmq])])
+    ])
+
+dnl END of PKG_CHECK_MODULES and/or direct tests for libzmq
+    AS_CASE(["x${was_libzmq_check_lib_detected}"],
+        [xpkgcfg], [
+                AC_SUBST([pkgconfig_name_libzmq],["${found_pkgconfig}"])
+                CFLAGS="${libzmq_CFLAGS} ${CFLAGS}"
+                LIBS="${libzmq_LIBS} ${LIBS}"
+            ],
+        [xyes], [
+                AC_SUBST([pkgconfig_name_libzmq],[""])
+                CFLAGS="${libzmq_synthetic_cflags} ${CFLAGS}"
+                LDFLAGS="${libzmq_synthetic_libs} ${LDFLAGS}"
+                LIBS="${libzmq_synthetic_libs} ${LIBS}"
+
+                AC_SUBST([libzmq_CFLAGS],[${libzmq_synthetic_cflags}])
+                AC_SUBST([libzmq_LIBS],[${libzmq_synthetic_libs}])
+            ],
+        [xno], [
+                AC_SUBST([pkgconfig_name_libzmq],[""])
+            AC_MSG_ERROR([Cannot find pkg-config metadata for libzmq 0.0.0 or higher])
+    ])
+])
+dnl END of enabled attempts to search for libzmq
+
+
+was_czmq_check_lib_detected=no
+
+search_libczmq="yes"
+
+AC_ARG_WITH([libczmq],
+    [
+        AS_HELP_STRING([--with-libczmq],
+        [yes or no. Optionally specify libczmq prefix (directory where its include/ and lib/ are located), but that is only used if pkgconfig metadata is not found first])
+    ],
+    [
+        search_libczmq="yes"
+    ],
+    [
+        search_libczmq="yes"
+    ])
+AS_CASE([x"${with_libczmq}"],
+    [xyes], [search_libczmq="yes"],
+    [xno],  [search_libczmq="no"])
+
+dnl We do not abort right now, because the maintainer/developer may have
+dnl something particular in mind, e.g. to build just parts of a project.
+AS_IF([test x"${search_libczmq}" = xno],
+    [AC_MSG_WARN([Required dependency on czmq was explicitly disabled during configuration by '--with-libczmq=no'; subsequent full build of fty-shm may fail])])
+
+AS_IF([test x"${search_libczmq}" = xyes], [
+    # Archive previously detected and supplied flags
+    PRE_SEARCH_CFLAGS="${CFLAGS}"
+    PRE_SEARCH_LIBS="${LIBS}"
+
+    found_pkgconfig=""
+    PKG_CHECK_MODULES([czmq], [libczmq >= 0.0.0],
+    [
+        PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE $czmq_LIBS"
+        was_czmq_check_lib_detected=pkgcfg
+        found_pkgconfig="libczmq"
+    ],
+    [
+        AC_MSG_NOTICE([Package libczmq not found; falling back to defined compilability tests])
+
+        czmq_synthetic_cflags=""
+        czmq_synthetic_libs="-lczmq"
+
+        if test -n "${with_libczmq}" && test x"${with_libczmq}" != xyes && test x"${with_libczmq}" != xno; then
+            if test -r "${with_libczmq}/include/czmq.h"; then
+                czmq_synthetic_cflags="-I${with_libczmq}/include"
+                czmq_synthetic_libs="-L${with_libczmq}/lib -lczmq"
+            else
+            AC_MSG_ERROR([Header file ${with_libczmq}/include/czmq.h was not found. Please check libczmq prefix])
+            fi
+        else
+            AC_CHECK_HEADER([czmq.h], [],
+            AC_MSG_ERROR([Header file czmq.h was not found in default search paths])
+                )
+        fi
+
+        AC_CHECK_LIB([czmq], [zhashx_test],
+            [
+                was_czmq_check_lib_detected=yes
+                PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE -lczmq"
+            ],
+            [AC_MSG_ERROR([cannot link with -lczmq, install libczmq])])
+    ])
+
+dnl END of PKG_CHECK_MODULES and/or direct tests for libczmq
+    AS_CASE(["x${was_czmq_check_lib_detected}"],
+        [xpkgcfg], [
+                AC_SUBST([pkgconfig_name_libczmq],["${found_pkgconfig}"])
+                CFLAGS="${czmq_CFLAGS} ${CFLAGS}"
+                LIBS="${czmq_LIBS} ${LIBS}"
+            ],
+        [xyes], [
+                AC_SUBST([pkgconfig_name_libczmq],[""])
+                CFLAGS="${czmq_synthetic_cflags} ${CFLAGS}"
+                LDFLAGS="${czmq_synthetic_libs} ${LDFLAGS}"
+                LIBS="${czmq_synthetic_libs} ${LIBS}"
+
+                AC_SUBST([czmq_CFLAGS],[${czmq_synthetic_cflags}])
+                AC_SUBST([czmq_LIBS],[${czmq_synthetic_libs}])
+            ],
+        [xno], [
+                AC_SUBST([pkgconfig_name_libczmq],[""])
+            AC_MSG_ERROR([Cannot find pkg-config metadata for libczmq 0.0.0 or higher])
+    ])
+])
+dnl END of enabled attempts to search for libczmq
+
+
+was_malamute_check_lib_detected=no
+
+search_libmlm="yes"
+
+AC_ARG_WITH([libmlm],
+    [
+        AS_HELP_STRING([--with-libmlm],
+        [yes or no. Optionally specify libmlm prefix (directory where its include/ and lib/ are located), but that is only used if pkgconfig metadata is not found first])
+    ],
+    [
+        search_libmlm="yes"
+    ],
+    [
+        search_libmlm="yes"
+    ])
+AS_CASE([x"${with_libmlm}"],
+    [xyes], [search_libmlm="yes"],
+    [xno],  [search_libmlm="no"])
+
+dnl We do not abort right now, because the maintainer/developer may have
+dnl something particular in mind, e.g. to build just parts of a project.
+AS_IF([test x"${search_libmlm}" = xno],
+    [AC_MSG_WARN([Required dependency on malamute was explicitly disabled during configuration by '--with-libmlm=no'; subsequent full build of fty-shm may fail])])
+
+AS_IF([test x"${search_libmlm}" = xyes], [
+    # Archive previously detected and supplied flags
+    PRE_SEARCH_CFLAGS="${CFLAGS}"
+    PRE_SEARCH_LIBS="${LIBS}"
+
+    found_pkgconfig=""
+    PKG_CHECK_MODULES([malamute], [libmlm >= 0.0.0],
+    [
+        PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE $malamute_LIBS"
+        was_malamute_check_lib_detected=pkgcfg
+        found_pkgconfig="libmlm"
+    ],
+    [
+        AC_MSG_NOTICE([Package libmlm not found; falling back to defined compilability tests])
+
+        malamute_synthetic_cflags=""
+        malamute_synthetic_libs="-lmlm"
+
+        if test -n "${with_libmlm}" && test x"${with_libmlm}" != xyes && test x"${with_libmlm}" != xno; then
+            if test -r "${with_libmlm}/include/malamute.h"; then
+                malamute_synthetic_cflags="-I${with_libmlm}/include"
+                malamute_synthetic_libs="-L${with_libmlm}/lib -lmlm"
+            else
+            AC_MSG_ERROR([Header file ${with_libmlm}/include/malamute.h was not found. Please check libmlm prefix])
+            fi
+        else
+            AC_CHECK_HEADER([malamute.h], [],
+            AC_MSG_ERROR([Header file malamute.h was not found in default search paths])
+                )
+        fi
+
+        AC_CHECK_LIB([mlm], [mlm_server_test],
+            [
+                was_malamute_check_lib_detected=yes
+                PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE -lmlm"
+            ],
+            [AC_MSG_ERROR([cannot link with -lmlm, install libmlm])])
+    ])
+
+dnl END of PKG_CHECK_MODULES and/or direct tests for libmlm
+    AS_CASE(["x${was_malamute_check_lib_detected}"],
+        [xpkgcfg], [
+                AC_SUBST([pkgconfig_name_libmlm],["${found_pkgconfig}"])
+                CFLAGS="${malamute_CFLAGS} ${CFLAGS}"
+                LIBS="${malamute_LIBS} ${LIBS}"
+            ],
+        [xyes], [
+                AC_SUBST([pkgconfig_name_libmlm],[""])
+                CFLAGS="${malamute_synthetic_cflags} ${CFLAGS}"
+                LDFLAGS="${malamute_synthetic_libs} ${LDFLAGS}"
+                LIBS="${malamute_synthetic_libs} ${LIBS}"
+
+                AC_SUBST([malamute_CFLAGS],[${malamute_synthetic_cflags}])
+                AC_SUBST([malamute_LIBS],[${malamute_synthetic_libs}])
+            ],
+        [xno], [
+                AC_SUBST([pkgconfig_name_libmlm],[""])
+            AC_MSG_ERROR([Cannot find pkg-config metadata for libmlm 0.0.0 or higher])
+    ])
+])
+dnl END of enabled attempts to search for libmlm
+
+
+was_fty_proto_check_lib_detected=no
+
+search_libfty_proto="yes"
+
+AC_ARG_WITH([libfty_proto],
+    [
+        AS_HELP_STRING([--with-libfty_proto],
+        [yes or no. Optionally specify libfty_proto prefix (directory where its include/ and lib/ are located), but that is only used if pkgconfig metadata is not found first])
+    ],
+    [
+        search_libfty_proto="yes"
+    ],
+    [
+        search_libfty_proto="yes"
+    ])
+AS_CASE([x"${with_libfty_proto}"],
+    [xyes], [search_libfty_proto="yes"],
+    [xno],  [search_libfty_proto="no"])
+
+dnl We do not abort right now, because the maintainer/developer may have
+dnl something particular in mind, e.g. to build just parts of a project.
+AS_IF([test x"${search_libfty_proto}" = xno],
+    [AC_MSG_WARN([Required dependency on fty_proto was explicitly disabled during configuration by '--with-libfty_proto=no'; subsequent full build of fty-shm may fail])])
+
+AS_IF([test x"${search_libfty_proto}" = xyes], [
+    # Archive previously detected and supplied flags
+    PRE_SEARCH_CFLAGS="${CFLAGS}"
+    PRE_SEARCH_LIBS="${LIBS}"
+
+    found_pkgconfig=""
+    PKG_CHECK_MODULES([fty_proto], [libfty_proto >= 1.0.0],
+    [
+        PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE $fty_proto_LIBS"
+        was_fty_proto_check_lib_detected=pkgcfg
+        found_pkgconfig="libfty_proto"
+    ],
+    [
+        AC_MSG_NOTICE([Package libfty_proto not found with needed constraints; falling back to defined compilability tests])
+
+        fty_proto_synthetic_cflags=""
+        fty_proto_synthetic_libs="-lfty_proto"
+
+        if test -n "${with_libfty_proto}" && test x"${with_libfty_proto}" != xyes && test x"${with_libfty_proto}" != xno; then
+            if test -r "${with_libfty_proto}/include/ftyproto.h"; then
+                fty_proto_synthetic_cflags="-I${with_libfty_proto}/include"
+                fty_proto_synthetic_libs="-L${with_libfty_proto}/lib -lfty_proto"
+            else
+            AC_MSG_ERROR([Header file ${with_libfty_proto}/include/ftyproto.h was not found. Please check libfty_proto prefix])
+            fi
+        else
+            AC_CHECK_HEADER([ftyproto.h], [],
+            AC_MSG_ERROR([Header file ftyproto.h was not found in default search paths])
+                )
+        fi
+
+        AC_CHECK_LIB([fty_proto], [fty_proto_test],
+            [
+                was_fty_proto_check_lib_detected=yes
+                PKGCFG_LIBS_PRIVATE="$PKGCFG_LIBS_PRIVATE -lfty_proto"
+            ],
+            [AC_MSG_ERROR([cannot link with -lfty_proto, install libfty_proto])])
+    ])
+
+dnl END of PKG_CHECK_MODULES and/or direct tests for libfty_proto
+    AS_CASE(["x${was_fty_proto_check_lib_detected}"],
+        [xpkgcfg], [
+                AC_SUBST([pkgconfig_name_libfty_proto],["${found_pkgconfig} >= 1.0.0"])
+                CFLAGS="${fty_proto_CFLAGS} ${CFLAGS}"
+                LIBS="${fty_proto_LIBS} ${LIBS}"
+            ],
+        [xyes], [
+                AC_SUBST([pkgconfig_name_libfty_proto],[""])
+                CFLAGS="${fty_proto_synthetic_cflags} ${CFLAGS}"
+                LDFLAGS="${fty_proto_synthetic_libs} ${LDFLAGS}"
+                LIBS="${fty_proto_synthetic_libs} ${LIBS}"
+
+                AC_SUBST([fty_proto_CFLAGS],[${fty_proto_synthetic_cflags}])
+                AC_SUBST([fty_proto_LIBS],[${fty_proto_synthetic_libs}])
+            ],
+        [xno], [
+                AC_SUBST([pkgconfig_name_libfty_proto],[""])
+            AC_MSG_ERROR([Cannot find pkg-config metadata for libfty_proto 1.0.0 or higher])
+    ])
+])
+dnl END of enabled attempts to search for libfty_proto
+
+
 CFLAGS="${PREVIOUS_CFLAGS}"
 LIBS="${PREVIOUS_LIBS}"
 

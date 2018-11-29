@@ -34,6 +34,22 @@
 #include <sys/time.h>
 #include <map>
 
+#include <algorithm>
+#include <assert.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <linux/fs.h>
+#include <random>
+#include <string.h>
+#include <sys/syscall.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <unordered_set>
+#include <regex>
+#include <iostream>
+
+
 static const char help_text[]
     = "benchmark [options] ...\n"
       "  -d, --directory=DIR   set a custom storage directory for testing\n"
@@ -110,7 +126,6 @@ void Benchmark::c_api_bench()
     char *values = new char[NUM_METRICS * VALUE_LEN];
     char **res_values = new char*[NUM_METRICS * sizeof(char *)];
     char **res_units = new char*[NUM_METRICS * sizeof(char *)];
-    std::vector<fty::shm::ShmMetric> all_metrics;
     init_default_dir();
     for (i = 0; i < NUM_METRICS; i++) {
         sprintf(names + i * METRIC_LEN, METRIC_FMT, i);
@@ -129,9 +144,6 @@ void Benchmark::c_api_bench()
                     &res_values[i], &res_units[i]);
         timestamp("reads");
     }
-  
-    fty::shm::read_metrics("metric", ".*", ".*", all_metrics);
-    timestamp("re-reads");
 
     delete[](names);
     delete[](values);
@@ -146,7 +158,7 @@ void Benchmark::c_api_bench()
 void Benchmark::cpp_api_bench()
 {
     std::vector<std::string> names, values;
-    std::vector<fty::shm::ShmMetric> all_metrics;
+    fty::shm::shmMetrics all_metrics;
     int i;
 
     names.reserve(NUM_METRICS);

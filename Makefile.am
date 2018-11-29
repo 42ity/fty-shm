@@ -12,10 +12,14 @@ AM_CXXFLAGS = \
     -std=c++11
 
 AM_CPPFLAGS = \
+    ${libzmq_CFLAGS} \
+    ${czmq_CFLAGS} \
+    ${malamute_CFLAGS} \
+    ${fty_proto_CFLAGS} \
     -D__STDC_FORMAT_MACROS \
     -I$(srcdir)/include
 
-project_libs =
+project_libs = ${libzmq_LIBS} ${czmq_LIBS} ${malamute_LIBS} ${fty_proto_LIBS}
 
 SUBDIRS = doc
 SUBDIRS += include
@@ -36,6 +40,10 @@ DISTCLEANFILES =
 
 if ENABLE_DIST_CMAKEFILES
 EXTRA_DIST += \
+    Findlibzmq.cmake \
+    Findczmq.cmake \
+    Findmalamute.cmake \
+    Findfty_proto.cmake \
     builds/cmake/Modules/ClangFormat.cmake \
     builds/cmake/clang-format-check.sh.in \
     builds/cmake/Config.cmake.in \

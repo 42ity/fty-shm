@@ -66,29 +66,29 @@ void init_default_dir();
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <fty_proto.h>
 
 namespace fty {
 namespace shm {
-    class ShmMetric {
+    class shmMetrics
+    {
         public :
-            ShmMetric(std::string family, std::string asset, std::string type, std::string value, std::string unit, long int timestamp, long int ttl);
-            ShmMetric(std::string value, std::string unit, long int timestamp, long int ttl);
-            void updateMetric(std::string family, std::string asset, std::string type);
-            const std::string getFamily() { return m_family; }
-            const std::string getType() { return m_type; }
-            const std::string getAsset() { return m_asset; }
-            const std::string getValue() { return m_value; }
-            const std::string getUnit() { return m_unit; }
-            const long int getTimestamp() { return m_timestamp; }
-            const long int getTtl() { return m_ttl; }
+            ~shmMetrics();
+            fty_proto_t* get(int index);
+            fty_proto_t* getDup(int index);
+            void add(fty_proto_t* metric);
+            long unsigned int size();
+
+            typedef typename std::vector<fty_proto_t*> vector_type;
+            typedef typename vector_type::iterator iterator;
+            typedef typename vector_type::const_iterator const_iterator;
+
+            inline iterator begin() noexcept { return m_metricsVector.begin(); }
+            inline const_iterator cbegin() const noexcept { return m_metricsVector.begin(); }
+            inline iterator end() noexcept { return m_metricsVector.end(); }
+            inline const_iterator cend() const noexcept { return m_metricsVector.end(); }
         private :
-            std::string m_family;
-            std::string m_type;
-            std::string m_asset;
-            std::string m_value;
-            std::string m_unit;
-            long int m_timestamp;
-            long int m_ttl;
+            std::vector<fty_proto_t*> m_metricsVector;
     };
 
     typedef std::vector<std::string> Assets;
@@ -101,6 +101,7 @@ namespace shm {
     int write_nut_metric(std::string asset, std::string metric, std::string value, int ttl);
 
     // C++ versions of fty_shm_write_metric()
+    int write_metric(fty_proto_t* metric);
     int write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
     inline int write_metric(const std::string& asset, const std::string& metric, const Metric& value, int ttl)
     {
@@ -142,7 +143,7 @@ namespace shm {
     // Returns 0 on success. On error, returns -1 and sets errno accordingly
     int read_asset_metrics(const std::string& asset, Metrics& metrics);
 
-    int read_metrics(const std::string& familly, const std::string& asset, const std::string& type, std::vector<ShmMetric>& result);
+    int read_metrics(const std::string& familly, const std::string& asset, const std::string& type, shmMetrics& result);
 }
 }
 
