@@ -368,7 +368,6 @@ int fty_shm_read_family(const char* family, std::string asset, std::string type,
 
     std::regex regType(type);
     std::regex regAsset(asset);
-    int dixfois = 0;
     std::cout << std::endl;
     while ((de = readdir(dir))) {
       const char* delim = strchr(de->d_name, SEPARATOR);
@@ -402,7 +401,7 @@ int fty::shm::read_metrics(const std::string& family, const std::string& asset, 
     struct dirent *de_root;
     if (!(dir = opendir(shm_dir)))
         return -1;
-    int dfd_root = dirfd(dir);
+    dirfd(dir);
     while ((de_root = readdir(dir))) {
       fty_shm_read_family(de_root->d_name, asset, type, result);
     }
@@ -410,6 +409,7 @@ int fty::shm::read_metrics(const std::string& family, const std::string& asset, 
   else {
     fty_shm_read_family(family.c_str(), asset, type, result);
   }
+  return 0;
 }
 
 int fty_shm_set_test_dir(const char* dir)
@@ -434,14 +434,14 @@ int fty_shm_cleanup(bool verbose)
 {
     DIR* dir;
     DIR* dir_child;
-    int dfd_root, dfd;
+    int  dfd;
     struct dirent *de, *de_root;
     int err = 0;
     std::string shm_subdir;
 
     if (!(dir = opendir(shm_dir)))
         return -1;
-    dfd_root = dirfd(dir);
+    dirfd(dir);
 
     while ((de_root = readdir(dir))) {
       shm_subdir = shm_dir;
@@ -628,7 +628,6 @@ int fty::shm::read_asset_metrics(const std::string& asset, Metrics& metrics)
     metrics.clear();
     while ((de = readdir(dir))) {
         const char* delim = strchr(de->d_name, SEPARATOR);
-        size_t len = strlen(de->d_name);
         size_t metric_len = delim - de->d_name;
         if (std::string(delim+1) != asset)
             continue;
