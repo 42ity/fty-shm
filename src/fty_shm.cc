@@ -63,6 +63,9 @@
 #define HEADER_LEN (TTL_LEN + UNIT_LEN)
 #define PAYLOAD_LEN (128 - HEADER_LEN)
 
+// Convenience macros
+#define FREE(x) (free(x), (x) = NULL)
+
 // This is only changed by the selftest code
 static const char* shm_dir = DEFAULT_SHM_DIR;
 static size_t shm_dir_len = strlen(DEFAULT_SHM_DIR);
@@ -732,7 +735,7 @@ void fty_shm_test(bool verbose)
     check_err(fty_shm_read_metric(asset1, metric1, &value, &unit));
     assert(value);
     assert(streq(value, value1));
-    FREE(value);
+    free(value);
     assert(unit);
     assert(streq(unit, unit1));
     FREE(unit);
