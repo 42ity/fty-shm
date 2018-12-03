@@ -22,7 +22,7 @@
 #ifndef FTY_SHM_INTERNAL_H_INCLUDED
 #define FTY_SHM_INTERNAL_H_INCLUDED
 
-// Clean up stale entries in /run/fty-shm-1. Returns 0 if no error has
+// Clean up stale entries in /var/run/fty-shm-1. Returns 0 if no error has
 // been encountered
 int fty_shm_cleanup(bool verbose);
 
