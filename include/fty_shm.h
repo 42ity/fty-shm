@@ -97,7 +97,7 @@ namespace shm {
         std::string unit;
     };
     typedef std::unordered_map<std::string, Metric> Metrics;
-    
+
     int write_nut_metric(std::string asset, std::string metric, std::string value, int ttl);
 
     // C++ versions of fty_shm_write_metric()
