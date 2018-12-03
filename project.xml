@@ -6,6 +6,7 @@
     url = "https://42ity.org"
     license = "GPL-2.0+"
     repository = "https://github.com/42ity/fty-shm"
+    header = "ftyshm.h"
     >
 
     <target name = "debian" />

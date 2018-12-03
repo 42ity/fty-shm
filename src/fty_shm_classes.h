@@ -30,7 +30,7 @@
 #include "platform.h"
 
 //  External API
-#include "../include/fty_shm.h"
+#include "../include/ftyshm.h"
 
 //  Extra headers
 

@@ -3,7 +3,7 @@
 #  Read the zproject/README.md for information about making permanent changes. #
 ################################################################################
 include_HEADERS = \
-    fty_shm.h \
+    ftyshm.h \
     fty_shm.h \
     fty_shm_library.h
 
