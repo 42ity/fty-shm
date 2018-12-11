@@ -28,7 +28,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+    
+//currently here until it can be merge in a fty_common* lib
+int fty_get_polling_interval();
 // This is the basic C API of the library. It allows to store and retrieve
 // individual metrics.
 

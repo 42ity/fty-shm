@@ -46,7 +46,7 @@
 #include "fty_shm.h"
 #include "internal.h"
 
-#define DEFAULT_SHM_DIR "/run/fty-shm-1"
+#define DEFAULT_SHM_DIR "/run/42shm"
 
 #define SEPARATOR '@'
 #define SEPARATOR_LEN 1
@@ -66,6 +66,17 @@
 
 // Convenience macros
 #define FREE(x) (free(x), (x) = NULL)
+
+int fty_get_polling_interval()
+{
+    static int val = 30;
+    zconfig_t *config = zconfig_load("/etc/fty-nut/fty-nut.cfg");
+    if(config) {
+      val = strtol(zconfig_get(config, "nut/polling_interval", "30"), NULL, 10);
+      zconfig_destroy(&config);
+    }
+    return val;
+}
 
 // This is only changed by the selftest code
 static const char* shm_dir = DEFAULT_SHM_DIR;
@@ -237,7 +248,7 @@ int read_data_metric(const char* filename, fty_proto_t *proto_metric) {
 
   file = fopen(filename, "r");
   if(file == NULL)
-    goto shm_out_fd;
+    return -1;
   if(fstat(fileno(file), &st) < 0)
     goto shm_out_fd;
 
@@ -422,127 +433,6 @@ int fty_shm_set_test_dir(const char* dir)
     shm_dir = dir;
     shm_dir_len = strlen(dir);
     return 0;
-}
-
-// renameat2() is unfortunately Linux-specific and glibc does not even
-// provide a wrapper
-static int rename_noreplace(int dfd, const char* src, const char* dst)
-{
-    int retcode = -1;
-#ifdef RENAME_NOREPLACE
-// renameat2 added in Linux kernel 3.15
-// fallback adapted from systemd:
-//     https://github.com/systemd/casync/commit/0be064e33d523654a1b7ff75092c05529dcc80b0
-// and https://github.com/systemd/casync/issues/36
-    retcode = syscall(SYS_renameat2, dfd, src, dfd, dst, RENAME_NOREPLACE);
-    if (retcode >= 0)
-        return retcode;
-#endif
-
-    /* Fallback to linkat() + unlinkat() if RENAME_NOREPLACE
-     * isn't available, so that we don't override existing
-     * files and create needless churn */
-    if (linkat(dfd, src, dfd, dst, 0) < 0) {
-        retcode = -errno;
-    } else {
-        (void) unlinkat(dfd, src, 0);
-        retcode = 0;
-    }
-
-    return retcode;
-}
-
-int fty_shm_cleanup(bool verbose)
-{
-    DIR* dir;
-    DIR* dir_child;
-    int  dfd;
-    struct dirent *de, *de_root;
-    int err = 0;
-    std::string shm_subdir;
-
-    if (!(dir = opendir(shm_dir)))
-        return -1;
-    dirfd(dir);
-
-    while ((de_root = readdir(dir))) {
-      shm_subdir = shm_dir;
-      shm_subdir.append("/");
-      shm_subdir.append(de_root->d_name);
-      if(!(dir_child = opendir(shm_subdir.c_str())))
-        continue;
-      dfd = dirfd(dir_child);
-      while ((de = readdir(dir_child))) {
-          int fd;
-          time_t now, ttl;
-          struct stat st1, st2;
-          char ttl_str[TTL_LEN];
-
-          if ((fd = openat(dfd, de->d_name, O_RDONLY | O_CLOEXEC)) < 0) {
-              err = -1;
-              continue;
-          }
-          if (fstat(fd, &st1) < 0) {
-              err = -1;
-              close(fd);
-              continue;
-          }
-          if (st1.st_size < HEADER_LEN) {
-              // Malformed file
-              close(fd);
-              continue;
-          }
-          if (read_buf(fd, ttl_str, TTL_LEN) < 0) {
-              err = -1;
-              close(fd);
-              continue;
-          }
-          close(fd);
-          if (parse_ttl(ttl_str, ttl) < 0) {
-              err = -1;
-              continue;
-          }
-          if (!ttl)
-              continue;
-          now = time(NULL);
-          // We wait for two times the ttl value before deleting the entry
-          if ((now - st1.st_mtime) / 2 <= ttl)
-              continue;
-          // We can race here, but that is not considered a problem. A
-          // metric not updated for twice the ttl time is already a bug
-          // and the effect of the race is following:
-          // 1. Metric expires
-          // 2. We check that another ttl seconds have passed
-          // 3. Metric gets updated
-          // 4. We erroneously delete the updated metric
-          // 5. We restore the updated metric
-          // i.e. the updated metric disappears briefly between 4. and 5.,
-          // while it had been gone for ttl seconds between 1. and 3.
-          if (renameat(dfd, de->d_name, dfd, ".delete") < 0) {
-              err = -1;
-              continue;
-          }
-          if (fstatat(dfd, ".delete", &st2, 0) < 0) {
-              // This should not happen
-              err = -1;
-              continue;
-          }
-          if (st1.st_dev == st2.st_dev && st1.st_ino == st2.st_ino) {
-              if (unlinkat(dfd, ".delete", 0) < 0)
-                  err = -1;
-              continue;
-          }
-          // We lost the race. Restore the metric, but only if it has not
-          // been updated for the second time.
-          if (rename_noreplace(dfd, ".delete", de->d_name) < 0) {
-              unlinkat(dfd, ".delete", 0);
-              err = -1;
-          }
-      }
-      closedir(dir_child);
-    }
-    closedir(dir);
-    return err;
 }
 
 // Write ttl and value to filename
