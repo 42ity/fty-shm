@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <limits.h>
 #include <linux/fs.h>
 #include <random>
