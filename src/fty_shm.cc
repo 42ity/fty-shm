@@ -30,6 +30,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <stdio.h>
 #include <limits.h>
 #include <linux/fs.h>
 #include <random>
@@ -427,7 +428,28 @@ int fty_shm_set_test_dir(const char* dir)
 // provide a wrapper
 static int rename_noreplace(int dfd, const char* src, const char* dst)
 {
-    return syscall(SYS_renameat2, dfd, src, dfd, dst, RENAME_NOREPLACE);
+    int retcode = -1;
+#ifdef RENAME_NOREPLACE
+// renameat2 added in Linux kernel 3.15
+// fallback adapted from systemd:
+//     https://github.com/systemd/casync/commit/0be064e33d523654a1b7ff75092c05529dcc80b0
+// and https://github.com/systemd/casync/issues/36
+    retcode = syscall(SYS_renameat2, dfd, src, dfd, dst, RENAME_NOREPLACE);
+    if (retcode >= 0)
+        return retcode;
+#endif
+
+    /* Fallback to linkat() + unlinkat() if RENAME_NOREPLACE
+     * isn't available, so that we don't override existing
+     * files and create needless churn */
+    if (linkat(dfd, src, dfd, dst, 0) < 0) {
+        retcode = -errno;
+    } else {
+        (void) unlinkat(dfd, src, 0);
+        retcode = 0;
+    }
+
+    return retcode;
 }
 
 int fty_shm_cleanup(bool verbose)

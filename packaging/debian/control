@@ -24,9 +24,12 @@ Maintainer:     fty-shm Developers <eatonipcopensource@eaton.com>
 Standards-Version: 4.0.1.0
 Build-Depends: debhelper (>= 9),
     pkg-config,
+    libsodium-dev,
     libzmq3-dev,
     libczmq-dev,
     libmlm-dev,
+    liblog4cplus-dev,
+    libfty-common-logging-dev,
     libfty-proto-dev,
     systemd,
     dh-systemd,
@@ -45,9 +48,12 @@ Architecture: any
 Section: libdevel
 Depends:
     ${misc:Depends},
+    libsodium-dev,
     libzmq3-dev,
     libczmq-dev,
     libmlm-dev,
+    liblog4cplus-dev,
+    libfty-common-logging-dev,
     libfty-proto-dev,
     libfty-shm0 (= ${binary:Version})
 Description: fty-shm development tools
