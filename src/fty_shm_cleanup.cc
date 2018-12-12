@@ -34,6 +34,11 @@
 #include "fty_shm.h"
 #include "internal.h"
 
+int fty_shm_cleanup(bool verbose) {
+  //TODO
+  return 0;
+}
+
 static const char help_text[]
     = "fty-shm-cleanup [options] ...\n"
       "  -v, --verbose         show verbose output\n"
