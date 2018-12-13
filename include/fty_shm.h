@@ -28,7 +28,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
+
+#define FTY_SHM_METRIC_TYPE "0"
 //currently here until it can be merge in a fty_common* lib
 int fty_get_polling_interval();
 // This is the basic C API of the library. It allows to store and retrieve
@@ -41,8 +42,6 @@ int fty_get_polling_interval();
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
 int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl);
 
-int fty_shm_write_nut_metric(const char* asset, const char* metric, const char* value, int ttl);
-
 // Retrieve a metric from shm. Caller must free the returned values.
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
 int fty_shm_read_metric(const char* asset, const char* metric, char** value, char** unit);
@@ -54,9 +53,11 @@ int fty_shm_delete_asset(const char* asset);
 // not be freed)
 int fty_shm_set_test_dir(const char* dir);
 
-void fty_shm_test(bool verbose);
+int fty_shm_delete_test_dir();
 
-void init_default_dir();
+void set_default_val_polling_interval(int val)
+
+void fty_shm_test(bool verbose);
 
 #ifdef __cplusplus
 }

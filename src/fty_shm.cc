@@ -67,12 +67,19 @@
 // Convenience macros
 #define FREE(x) (free(x), (x) = NULL)
 
+int default_val_polling_interval = 30;
+
+void set_default_val_polling_interval(int val)
+{
+  default_val_polling_interval = val;
+}
+
 int fty_get_polling_interval()
 {
-    static int val = 30;
+    static int val = default_val_polling_interval;
     zconfig_t *config = zconfig_load("/etc/fty-nut/fty-nut.cfg");
     if(config) {
-      val = strtol(zconfig_get(config, "nut/polling_interval", "30"), NULL, 10);
+      val = strtol(zconfig_get(config, "nut/polling_interval", std::to_string(val).c_str()), NULL, 10);
       zconfig_destroy(&config);
     }
     return val;
@@ -113,7 +120,7 @@ static int prepare_filename(char* buf, const char* asset, size_t a_len, const ch
 
 static int prepare_filename(char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len)
 {
-  return prepare_filename(buf, asset, a_len, metric, m_len, "metric");
+  return prepare_filename(buf, asset, a_len, metric, m_len, FTY_SHM_METRIC_TYPE);
 }
 
 // Assumes len is small enough for the read to be atomic (i.e. <= 4k)
@@ -424,12 +431,57 @@ int fty::shm::read_metrics(const std::string& family, const std::string& asset, 
   return 0;
 }
 
+int fty_shm_delete_test_dir()
+{
+  if(strcmp (shm_dir,DEFAULT_SHM_DIR) == 0)
+    return -2;
+
+  struct dirent *entry = NULL;
+  DIR *dir = NULL;
+  std::string metric_dir(shm_dir);
+  metric_dir.append("/").append(FTY_SHM_METRIC_TYPE);
+  dir = opendir(metric_dir.c_str());
+
+  while (entry = readdir(dir))
+  {
+    FILE *file = NULL;
+    char abs_path[255] = {0};
+    if(strstr(entry->d_name, "@") != NULL )
+    {
+      
+      sprintf(abs_path, "%s/%s", metric_dir.c_str(), entry->d_name);
+      if(file = fopen(abs_path, "r"))
+      {
+        fclose(file);
+        remove(abs_path);
+      }
+    }
+  }
+  remove(metric_dir.c_str());
+  return remove(shm_dir);
+}
+
 int fty_shm_set_test_dir(const char* dir)
 {
+    int ret = 0;
     if (strlen(dir) > PATH_MAX - strlen("/") - NAME_MAX) {
         errno = ENAMETOOLONG;
         return -1;
     }
+    DIR* dird;
+    if(!(dird = opendir(dir)))
+      ret = mkdir(dir, 0777);
+    
+    if(ret != 0)
+      return ret;
+    
+    std::string subdir(dir);
+    subdir.append("/").append(FTY_SHM_METRIC_TYPE);
+    if(!(dird = opendir(subdir.c_str())))
+      ret = mkdir(subdir.c_str(), 0777);
+    
+    if(ret != 0)
+      return ret;
     shm_dir = dir;
     shm_dir_len = strlen(dir);
     return 0;
@@ -532,7 +584,7 @@ int fty::shm::read_asset_metrics(const std::string& asset, Metrics& metrics)
 
     std::string shm_dirmetrics = shm_dir;
     shm_dirmetrics.append("/");
-    shm_dirmetrics.append("metric");
+    shm_dirmetrics.append(FTY_SHM_METRIC_TYPE);
     if (!(dir = opendir(shm_dirmetrics.c_str())))
         return -1;
 
@@ -575,10 +627,6 @@ long unsigned int fty::shm::shmMetrics::size() {
 
 void fty::shm::shmMetrics::add(fty_proto_t* metric) {
   m_metricsVector.push_back(metric);
-}
-
-void init_default_dir() {
-  chdir(DEFAULT_SHM_DIR);
 }
 
 //  --------------------------------------------------------------------------
