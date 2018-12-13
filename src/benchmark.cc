@@ -126,7 +126,6 @@ void Benchmark::c_api_bench()
     char *values = new char[NUM_METRICS * VALUE_LEN];
     char **res_values = new char*[NUM_METRICS * sizeof(char *)];
     char **res_units = new char*[NUM_METRICS * sizeof(char *)];
-    init_default_dir();
     for (i = 0; i < NUM_METRICS; i++) {
         sprintf(names + i * METRIC_LEN, METRIC_FMT, i);
         sprintf(values + i * VALUE_LEN, VALUE_FMT, i);
