@@ -442,7 +442,8 @@ int fty_shm_delete_test_dir()
   metric_dir.append("/").append(FTY_SHM_METRIC_TYPE);
   dir = opendir(metric_dir.c_str());
 
-  while (entry = readdir(dir))
+  entry = readdir(dir);
+  while (entry != NULL)
   {
     FILE *file = NULL;
     char abs_path[255] = {0};
@@ -450,12 +451,14 @@ int fty_shm_delete_test_dir()
     {
       
       sprintf(abs_path, "%s/%s", metric_dir.c_str(), entry->d_name);
-      if(file = fopen(abs_path, "r"))
+      file = fopen(abs_path, "r");
+      if(file != NULL)
       {
         fclose(file);
         remove(abs_path);
       }
     }
+    entry = readdir(dir);
   }
   remove(metric_dir.c_str());
   return remove(shm_dir);
