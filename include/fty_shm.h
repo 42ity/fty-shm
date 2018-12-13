@@ -55,7 +55,7 @@ int fty_shm_set_test_dir(const char* dir);
 
 int fty_shm_delete_test_dir();
 
-void set_default_val_polling_interval(int val)
+void set_default_val_polling_interval(int val);
 
 void fty_shm_test(bool verbose);
 
