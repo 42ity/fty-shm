@@ -69,7 +69,7 @@
 
 int default_val_polling_interval = 30;
 
-void set_default_val_polling_interval(int val)
+void fty_shm_set_default_polling_interval(int val)
 {
   default_val_polling_interval = val;
 }
