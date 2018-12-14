@@ -387,7 +387,6 @@ int fty_shm_read_family(const char* family, std::string asset, std::string type,
 
     std::regex regType(type);
     std::regex regAsset(asset);
-    std::cout << std::endl;
     while ((de = readdir(dir))) {
       const char* delim = strchr(de->d_name, SEPARATOR);
       //If not a valid metric
