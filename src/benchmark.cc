@@ -53,6 +53,7 @@
 static const char help_text[]
     = "benchmark [options] ...\n"
       "  -d, --directory=DIR   set a custom storage directory for testing\n"
+      "  -c, --clean           clean and delete the custom storage directory (work only if -d)\n"
       "  -r, --write           only benchmark writes\n"
       "  -r, --read            only benchmark reads\n"
       "  -b, --benchmark=NAME  select benchmark to run (use -b help for a list)\n"
@@ -183,8 +184,9 @@ void Benchmark::cpp_api_bench()
         timestamp("reads");
     }
 
-    fty::shm::read_metrics("metric", ".*", ".*", all_metrics);
-    timestamp("re-reawSds");
+    fty::shm::read_metrics("0", ".*", ".*", all_metrics);
+    std::cout << "number : " << all_metrics.size() << "\n";
+    timestamp("readsall");
 }
 
 struct BenchmarkDesc {
@@ -200,11 +202,13 @@ std::map<std::string, BenchmarkDesc> benchmarks = {
 int main(int argc, char **argv)
 {
     Benchmark benchmark;
-    Benchmark::benchmark_fn func = &Benchmark::c_api_bench;
+    Benchmark::benchmark_fn func = &Benchmark::cpp_api_bench;
+    bool bclean = false;
 
     static struct option long_opts[] = {
         { "help", no_argument, 0, 'h' },
         { "directory", required_argument, 0, 'd' },
+        { "clean", no_argument, 0, 'c' },
         { "write", no_argument, 0, 'w' },
         { "read", no_argument, 0, 'r' },
         { "benchmark", required_argument, 0, 'b' }
@@ -223,6 +227,9 @@ int main(int argc, char **argv)
             break;
         case 'r':
             benchmark.do_write = false;
+            break;
+        case 'c':
+            bclean = true;
             break;
         case 'w':
             benchmark.do_read = false;
@@ -254,6 +261,8 @@ int main(int argc, char **argv)
     }
 
     (benchmark.*func)();
+    if(bclean)
+      fty_shm_delete_test_dir();
 
     return 0;
 }
