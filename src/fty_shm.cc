@@ -409,10 +409,14 @@ int fty_shm_read_family(const char* family, std::string asset, std::string type,
       }
     }
   } catch(const std::regex_error& e) {
+    closedir(dir);
     chdir(working_dir);
+    free(working_dir);
     return -1;
   }
+  closedir(dir);
   chdir(working_dir);
+  free(working_dir);
   return 0;
 }
 
@@ -463,6 +467,7 @@ int fty_shm_delete_test_dir()
     }
     entry = readdir(dir);
   }
+  closedir(dir);
   remove(metric_dir.c_str());
   return remove(shm_dir);
 }
@@ -477,7 +482,8 @@ int fty_shm_set_test_dir(const char* dir)
     DIR* dird;
     if(!(dird = opendir(dir)))
       ret = mkdir(dir, 0777);
-    
+    else
+      closedir(dird);
     if(ret != 0)
       return ret;
     
@@ -485,6 +491,8 @@ int fty_shm_set_test_dir(const char* dir)
     subdir.append("/").append(FTY_SHM_METRIC_TYPE);
     if(!(dird = opendir(subdir.c_str())))
       ret = mkdir(subdir.c_str(), 0777);
+    else
+      closedir(dird);
     
     if(ret != 0)
       return ret;
