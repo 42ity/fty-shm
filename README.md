@@ -7,6 +7,12 @@ memory (SHM). It provides a basic C api and a more full-featured C++ api. For
 any given metric, there can be any number of writers and readers and the
 library guarantees that the data will be consistent.
 
+## Environment variable
+
+This library use the environment variable FTY_SHM_AUTOCLEAN to decide if it 
+must autodelete the outdated metrics or not. If FTY_SHM_AUTOCLEAN is set to "OFF",
+the outdated metrics will not be automaticly deleted.
+
 ## C api
 
 ```c

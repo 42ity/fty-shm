@@ -270,7 +270,11 @@ int read_data_metric(const char* filename, fty_proto_t *proto_metric) {
         now = time(NULL);
         if (now - st.st_mtime > ttl) {
             errno = ESTALE;
-            goto shm_out_fd;
+            fclose(file);
+            char *valenv = getenv("FTY_SHM_AUTOCLEAN");
+            if(!valenv || strcmp(valenv, "OFF") != 0)
+              remove(filename);
+            return -1;
         }
     }
 
