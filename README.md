@@ -12,6 +12,8 @@ library guarantees that the data will be consistent.
 This library use the environment variable FTY_SHM_AUTOCLEAN to decide if it 
 must autodelete the outdated metrics or not. If FTY_SHM_AUTOCLEAN is set to "OFF",
 the outdated metrics will not be automaticly deleted.
+The environment variable FTY_SHM_TEST_POLLING_INTERVAL is set by fty_shm_set_default_polling_interval.
+It will overload the fty-nut.cfg if the value is a number > to 0.
 
 ## C api
 

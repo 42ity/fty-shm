@@ -67,16 +67,18 @@
 // Convenience macros
 #define FREE(x) (free(x), (x) = NULL)
 
-int default_val_polling_interval = 30;
-
 void fty_shm_set_default_polling_interval(int val)
 {
-  default_val_polling_interval = val;
+  std::string s = std::to_string(val);
+  setenv("FTY_SHM_TEST_POLLING_INTERVAL", s.c_str(), 1);
 }
 
 int fty_get_polling_interval()
 {
-    static int val = default_val_polling_interval;
+    static int val = 30;
+    char *data = getenv("FTY_SHM_TEST_POLLING_INTERVAL");
+    if(data && strtol(data, NULL, 10) > 0)
+      return strtol(data,NULL, 10);
     zconfig_t *config = zconfig_load("/etc/fty-nut/fty-nut.cfg");
     if(config) {
       val = strtol(zconfig_get(config, "nut/polling_interval", std::to_string(val).c_str()), NULL, 10);
