@@ -512,7 +512,10 @@ static int write_metric_data(const char* filename, fty_proto_t* metric)
     int ttl = fty_proto_ttl(metric);
     if (ttl < 0)
         ttl = 0;
-    fprintf(file, "%d\n%s\n%s", ttl, fty_proto_unit(metric), fty_proto_value(metric));
+
+    std::string fmt(TTL_FMT);
+    fmt.append(UNIT_FMT).append("%s");
+    fprintf(file, fmt.c_str(), ttl, fty_proto_unit(metric), fty_proto_value(metric));
     zhash_t *aux = fty_proto_aux(metric);
 
     if (aux) {
