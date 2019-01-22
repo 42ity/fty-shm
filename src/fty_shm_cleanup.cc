@@ -93,7 +93,7 @@ int fty_shm_cleanup(std::string directory_path, bool verbose) {
   struct dirent *ent;
   if ((dir = opendir (directory_path.c_str())) != NULL) {
     while ((ent = readdir (dir)) != NULL) {
-      if(ent->d_name == "." || ent->d_name == "..")
+      if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
         continue;
       std::string filename(directory_path);
       filename.append("/").append(ent->d_name);
