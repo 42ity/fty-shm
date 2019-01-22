@@ -178,15 +178,22 @@ void Benchmark::cpp_api_bench()
         timestamp("writes");
     }
     if (do_read) {
-        std::string res_value, res_unit;
+        std::string res_value;
         for (i = 0; i < NUM_METRICS; i++)
-            fty::shm::read_metric("bench_asset", names[i], res_value, res_unit);
-        timestamp("reads");
-    }
+            fty::shm::read_metric_value("bench_asset", names[i], res_value);
+        timestamp("reads value");
+        
+        fty_proto_t *proto;
+        for (i = 0; i < NUM_METRICS; i++) {
+          fty::shm::read_metric("bench_asset", names[i], &proto);
+          fty_proto_destroy(&proto);
+        }
 
-    fty::shm::read_metrics("0", ".*", ".*", all_metrics);
-    std::cout << "number : " << all_metrics.size() << "\n";
-    timestamp("readsall");
+        timestamp("reads proto");
+
+        fty::shm::read_metrics(".*", ".*", all_metrics);
+        timestamp("readsall");
+    }
 }
 
 struct BenchmarkDesc {
@@ -216,7 +223,7 @@ int main(int argc, char **argv)
 
     int c = 0;
     while (c >= 0) {
-        c = getopt_long(argc, argv, "hd:rwb:", long_opts, 0);
+        c = getopt_long(argc, argv, "hd:crwb:", long_opts, 0);
 
         switch (c) {
         case 'h':

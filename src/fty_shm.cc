@@ -120,11 +120,6 @@ static int prepare_filename(char* buf, const char* asset, size_t a_len, const ch
     return 0;
 }
 
-static int prepare_filename(char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len)
-{
-  return prepare_filename(buf, asset, a_len, metric, m_len, FTY_SHM_METRIC_TYPE);
-}
-
 // Assumes len is small enough for the read to be atomic (i.e. <= 4k)
 static ssize_t read_buf(int fd, char* buf, size_t len)
 {
@@ -134,15 +129,6 @@ static ssize_t read_buf(int fd, char* buf, size_t len)
         return -1;
     }
     return ret;
-}
-
-int fty_write_nut_metric(std::string asset, std::string metric, std::string value, int ttl) {
-  return fty::shm::write_nut_metric(asset, metric, value, ttl);
-}
-
-int fty::shm::write_nut_metric(std::string asset, std::string metric, std::string value, int ttl) {
-  //TODO : convert nut metric name to fty metric name and select the right unit.
-  return write_metric(asset, metric, value, "NULL", ttl);
 }
 
 // Write ttl and value to filename
@@ -278,7 +264,7 @@ int read_data_metric(const char* filename, fty_proto_t *proto_metric) {
               remove(filename);
             return -1;
         }
-    }
+  }
 
   //set ttl
   fty_proto_set_ttl(proto_metric,ttl);
@@ -330,7 +316,7 @@ int fty_shm_write_metric(const char* asset, const char* metric, const char* valu
 {
     char filename[PATH_MAX];
 
-    if (prepare_filename(filename, asset, strlen(asset), metric, strlen(metric)) < 0)
+    if (prepare_filename(filename, asset, strlen(asset), metric, strlen(metric), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
     return write_value(filename, value, unit, ttl);
 }
@@ -339,7 +325,7 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
 {
     char filename[PATH_MAX];
 
-    if (prepare_filename(filename, asset, strlen(asset), metric, strlen(metric)) < 0)
+    if (prepare_filename(filename, asset, strlen(asset), metric, strlen(metric), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
     if (!unit) {
         char* dummy;
@@ -347,33 +333,6 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
     }
     return read_value(filename, *value, *unit);
 }
-
-int fty_shm_delete_asset(const char* asset)
-{
-    DIR* dir;
-    struct dirent* de;
-    int err = 0;
-
-    if (!(dir = opendir(shm_dir)))
-        return -1;
-
-    while ((de = readdir(dir))) {
-        const char* delim = strchr(de->d_name, ':');
-        if (!delim)
-            // Malformed filename
-            continue;
-        size_t asset_len = delim - de->d_name;
-        if (std::string(de->d_name, asset_len) != asset)
-            continue;
-        char filename[PATH_MAX];
-        sprintf(filename, "%s/%s", shm_dir, de->d_name);
-        if (unlink(filename) < 0)
-            err = -1;
-    }
-    closedir(dir);
-    return err;
-}
-
 
 int fty_shm_read_family(const char* family, std::string asset, std::string type, fty::shm::shmMetrics& result)
 {
@@ -422,9 +381,10 @@ int fty_shm_read_family(const char* family, std::string asset, std::string type,
   return 0;
 }
 
-int fty::shm::read_metrics(const std::string& family, const std::string& asset, const std::string& type, shmMetrics& result)
+int fty::shm::read_metrics(const std::string& asset, const std::string& type, shmMetrics& result)
 {
   DIR* dir;
+  std::string family(FTY_SHM_METRIC_TYPE);
   if(family == "*") {
     struct dirent *de_root;
     if (!(dir = opendir(shm_dir)))
@@ -536,7 +496,7 @@ int fty::shm::write_metric(fty_proto_t* metric)
 {
     char filename[PATH_MAX];
 
-    if (prepare_filename(filename, fty_proto_name(metric), strlen(fty_proto_name(metric)), fty_proto_type(metric), strlen(fty_proto_type(metric))) < 0)
+    if (prepare_filename(filename, fty_proto_name(metric), strlen(fty_proto_name(metric)), fty_proto_type(metric), strlen(fty_proto_type(metric)), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
     return write_metric_data(filename, metric);
 }
@@ -544,85 +504,42 @@ int fty::shm::write_metric(fty_proto_t* metric)
 int fty::shm::write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl)
 {
     char filename[PATH_MAX];
-    std::string dummy;
 
-    if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length()) < 0)
+    if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length(), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
     return write_value(filename, value.c_str(), unit.c_str(), ttl);
 }
 
-int fty::shm::read_metric(const std::string& asset, const std::string& metric, std::string& value)
+int fty::shm::read_metric_value(const std::string& asset, const std::string& metric, std::string& value)
 {
     char filename[PATH_MAX];
     std::string dummy;
 
-    if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length()) < 0)
+    if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length(), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
     return read_value(filename, value, dummy, false);
 }
 
-int fty::shm::read_metric(const std::string& asset, const std::string& metric, std::string& value, std::string& unit)
-{
-    char filename[PATH_MAX];
+int fty::shm::read_metric(const std::string& asset, const std::string& metric, fty_proto_t **proto_metric) {
+  if(proto_metric == NULL) {
+    return -1;
+  }
 
-    if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length()) < 0)
-        return -1;
-    return read_value(filename, value, unit);
-}
+  char filename[PATH_MAX];
+  
+  if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length(), FTY_SHM_METRIC_TYPE) < 0)
+      return -1;
 
-/*int fty::shm::find_assets(Assets& assets)
-{
-    DIR* dir;
-    struct dirent* de;
-    std::unordered_set<std::string> seen;
+  *proto_metric = fty_proto_new(FTY_PROTO_METRIC);
+  fty_proto_set_name(*proto_metric, "%s", asset.c_str());
+  fty_proto_set_type(*proto_metric, "%s", metric.c_str());
 
-    if (!(dir = opendir(shm_dir)))
-        return -1;
+  int ret = read_data_metric(filename, *proto_metric);
+  if(ret != 0) {
+    fty_proto_destroy(proto_metric);
+  }
 
-    // TODO: Remember the number of items from last time and reserve it
-    assets.clear();
-    while ((de = readdir(dir))) {
-        char* delim = strchr(de->d_name, ':');
-        if (!delim)
-            // Malformed filename
-            continue;
-        *delim = '\0';
-        if (!seen.insert(de->d_name).second)
-            continue;
-        assets.push_back(de->d_name);
-    }
-    closedir(dir);
-    return 0;
-}*/
-
-int fty::shm::read_asset_metrics(const std::string& asset, Metrics& metrics)
-{
-    DIR* dir;
-    struct dirent* de;
-    int err = -1;
-
-    std::string shm_dirmetrics = shm_dir;
-    shm_dirmetrics.append("/");
-    shm_dirmetrics.append(FTY_SHM_METRIC_TYPE);
-    if (!(dir = opendir(shm_dirmetrics.c_str())))
-        return -1;
-
-    metrics.clear();
-    while ((de = readdir(dir))) {
-        const char* delim = strchr(de->d_name, SEPARATOR);
-        size_t metric_len = delim - de->d_name;
-        if (std::string(delim+1) != asset)
-            continue;
-        Metric metric;
-        char filename[PATH_MAX];
-        sprintf(filename, "%s/%s", shm_dirmetrics.c_str(), de->d_name);
-        if (read_value(filename, metric.value, metric.unit) < 0)
-            continue;
-        err = 0;
-        metrics.emplace(std::string(delim + 1, metric_len), metric);
-    }
-    closedir(dir);
-    return err;
+  return ret;
 }
 
 fty::shm::shmMetrics::~shmMetrics() {
@@ -663,6 +580,208 @@ void fty::shm::shmMetrics::add(fty_proto_t* metric) {
 
 void fty_shm_test(bool verbose)
 {
-    //TODO
-    printf("OK\n");
+  std::string value;
+  fty_proto_t *proto_metric, *proto_metric_result;
+
+  assert(fty_shm_set_test_dir("src/selftest-rw") == 0);
+
+  assert(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
+
+  assert(fty::shm::read_metric_value("asset", "metric", value) == 0);
+  assert(value == "here_is_my_value");
+  printf("#1.1 Value ok\n");
+  assert(fty::shm::read_metric("asset", "metric", &proto_metric) == 0);
+  assert(proto_metric != NULL);
+  char *result = (char*) fty_proto_name(proto_metric);
+  assert (result!=NULL && streq (result, "asset"));
+  result = (char*) fty_proto_type(proto_metric);
+  assert (result!=NULL && streq (result, "metric"));
+  assert (fty_proto_ttl(proto_metric) == 2);
+  result = (char*) fty_proto_value(proto_metric);
+  assert (result!=NULL && streq (result, "here_is_my_value"));
+  result = (char*) fty_proto_unit(proto_metric);
+  assert(result != NULL);
+  printf("%s\n",result);
+//  assert (result!=NULL && streq (result, "unit?"));
+  printf("#1.2 fty_proto ok\n");
+
+  //Wait the end of the data and test no more metrics
+  zclock_sleep (3000);
+  value = "none";
+  assert(fty::shm::read_metric_value("asset", "metric", value) < 0);
+  assert(value == "none");
+
+  //test write-read proto metric (with aux)
+  fty_proto_aux_insert(proto_metric, "myfirstaux", "%s", "value_first_aux");
+  fty_proto_aux_insert(proto_metric, "mysecondaux", "%s", "value_second_aux");
+  assert(fty::shm::write_metric(proto_metric) == 0);
+
+  assert(fty::shm::read_metric("asset", "metric", &proto_metric_result) == 0);
+  result = (char*) fty_proto_name(proto_metric_result);
+  assert (result!=NULL && streq (result, "asset"));
+  result = (char*) fty_proto_type(proto_metric_result);
+  assert (result!=NULL && streq (result, "metric"));
+  assert (fty_proto_ttl(proto_metric_result) == 2);
+  result = (char*) fty_proto_value(proto_metric_result);
+  assert (result!=NULL && streq (result, "here_is_my_value"));
+  result = (char*) fty_proto_unit(proto_metric_result);
+  //assert (result!=NULL && streq (result, "unit?"));
+  result = (char*) fty_proto_aux_string(proto_metric_result, "myfirstaux", "none");
+  assert (result!=NULL && streq (result, "value_first_aux"));
+  result = (char*) fty_proto_aux_string(proto_metric_result, "mysecondaux", "none");
+  assert (result!=NULL && streq (result, "value_second_aux"));
+  fty_proto_destroy(&proto_metric_result);
+  fty_proto_destroy(&proto_metric);
+  printf("#2 write-read full proto : OK\n");
+  
+  zclock_sleep(3000);
+
+  //test metric "update"
+  assert(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
+  assert(fty::shm::write_metric("asset", "metric", "here_is_my_real_value", "unit?", 2) == 0);
+  assert(fty::shm::read_metric_value("asset", "metric", value) == 0);
+  assert(value == "here_is_my_real_value");
+  printf("#3 update OK\n");
+  //Wait the end of the data
+  zclock_sleep (3000);
+
+  //write severals metrics and test multiple read
+  assert(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 5) == 0);
+  assert(fty::shm::write_metric("asset2", "metric", "here_is_my_other_value", "unit?", 5) == 0);
+  assert(fty::shm::write_metric("asset", "metric2", "here_is_my_value_2", "unit?", 5) == 0);
+  assert(fty::shm::write_metric("asset2", "metric2", "here_is_my_other_value_2", "unit?", 5) == 0);
+  assert(fty::shm::read_metric_value("asset", "metric", value) == 0);
+  assert(value == "here_is_my_value");
+  assert(fty::shm::read_metric_value("asset2", "metric", value) == 0);
+  assert(value == "here_is_my_other_value");
+  assert(fty::shm::read_metric_value("asset", "metric2", value) == 0);
+  assert(value == "here_is_my_value_2");
+  assert(fty::shm::read_metric_value("asset2", "metric2", value) == 0);
+  assert(value == "here_is_my_other_value_2");
+
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics(".*", ".*", resultM);
+    assert(resultM.size() == 4);
+    for(auto &metric : resultM) {
+      char* resultT = (char*) fty_proto_type(metric);
+      result = (char*) fty_proto_name(metric);
+      assert(result!=NULL && ((streq (result, "asset") == 0) || (streq (result, "asset2") == 0)));
+      assert(resultT!=NULL && ((streq (resultT, "metric") == 0) || (streq (resultT, "metric2") == 0)));
+      if(streq (result, "asset") == 0) {
+        if(streq(resultT, "metric") == 0) {
+          result = (char*) fty_proto_value(metric);
+          assert(result!=NULL && (streq (result, "here_is_my_value") == 0));
+        } else {        
+          result = (char*) fty_proto_value(metric);
+          assert(result!=NULL && (streq (result, "here_is_my_value_2") == 0));
+        }
+      } else {
+        if(streq(resultT, "metric2") == 0) {
+          result = (char*) fty_proto_value(metric);
+          assert(result!=NULL && (streq (result, "here_is_my_other_value") == 0));
+        } else {        
+          result = (char*) fty_proto_value(metric);
+          assert(result!=NULL && (streq (result, "here_is_my_other_value_2") == 0));
+        }
+      }
+    }
+  }
+  printf("#4 Full read OK\n");
+  //test regex
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics(".*2", ".*", resultM);
+    assert(resultM.size() == 2);
+  }
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics(".*", ".*2", resultM);
+    assert(resultM.size() == 2);
+  }
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics("asset", ".*", resultM);
+    assert(resultM.size() == 2);
+  }
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics(".*", "metric", resultM);
+    assert(resultM.size() == 2);
+  }
+
+  assert(fty::shm::write_metric("other2", "metric", "here_is_my_value", "unit?", 5) == 0);
+  assert(fty::shm::write_metric("other", "metric", "here_is_my_value", "unit?", 5) == 0);
+  assert(fty::shm::write_metric("other2_asset", "metric", "here_is_my_value", "unit?", 5) == 0);
+  assert(fty::shm::write_metric("asset_other", "metric", "here_is_my_value", "unit?", 5) == 0);
+
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics("^asset.*", ".*", resultM);
+    assert(resultM.size() == 5);
+  }
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics(".*other.*", ".*", resultM);
+    assert(resultM.size() == 4);
+  }
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics("(^asset|other)((?!2).)*", ".*", resultM);
+    assert(resultM.size() == 4);
+  }
+  printf("#5 regex tests OK\n");
+
+  //verify the autoclean
+  assert(fty::shm::write_metric("long", "duration", "here_the_metric", "stand", 10) == 0);
+  
+  //get the number of "file" in the directory
+  DIR *dir;
+  struct dirent *ent;
+  int dir_number = 0;
+  std::string dir_metric("src/selftest-rw/");
+  dir_metric.append(FTY_SHM_METRIC_TYPE);
+  if ((dir = opendir (dir_metric.c_str())) != NULL) {
+    while ((ent = readdir (dir)) != NULL) {
+      dir_number++;
+    }
+    closedir (dir);
+  } else {
+    /* could not open directory */
+    perror ("");
+    assert(false);
+  }
+  
+  
+  //we must have file number egals to number_of_metric + 2 (. and ..)
+  assert(dir_number == 11);
+  //wait the expiration of some metrics
+  zclock_sleep(6000);
+  
+  {
+    fty::shm::shmMetrics resultM;
+    fty::shm::read_metrics(".*", ".*", resultM);
+    assert(resultM.size() == 1);
+  }
+  
+  //get the new number of "files"
+  dir_number = 0;
+  if ((dir = opendir (dir_metric.c_str())) != NULL) {
+    while ((ent = readdir (dir)) != NULL) {
+      dir_number++;
+    }
+    closedir (dir);
+  } else {
+    /* could not open directory */
+    perror ("");
+    assert(false);
+  }
+  
+  //only one metric file left
+  assert(dir_number == 3);
+  printf("#6 Autoclean : OK\n");
+
+  fty_shm_delete_test_dir();
+
+  printf("OK\n");
 }

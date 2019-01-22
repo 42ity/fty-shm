@@ -57,6 +57,7 @@ src_fty_shm_cleanup_config_DATA += src/fty-shm-cleanup.cfg
 src_fty_shm_cleanup_configdir = $(sysconfdir)/fty-shm
 if WITH_SYSTEMD_UNITS
 systemdsystemunit_DATA += src/fty-shm-cleanup.service
+systemdsystemunit_DATA += src/fty-shm-cleanup.timer
 endif #WITH_SYSTEMD_UNITS
 endif #ENABLE_FTY_SHM_CLEANUP
 
