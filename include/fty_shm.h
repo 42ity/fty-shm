@@ -32,6 +32,7 @@ extern "C" {
 #define FTY_SHM_METRIC_TYPE "0"
 //currently here until it can be merge in a fty_common* lib
 int fty_get_polling_interval();
+void fty_shm_set_default_polling_interval(int val);
 // This is the basic C API of the library. It allows to store and retrieve
 // individual metrics.
 
@@ -46,16 +47,11 @@ int fty_shm_write_metric(const char* asset, const char* metric, const char* valu
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
 int fty_shm_read_metric(const char* asset, const char* metric, char** value, char** unit);
 
-// Delete all metrics associated with this asset from shm
-int fty_shm_delete_asset(const char* asset);
-
 // Use a custom storage directory for test purposes (the passed string must
 // not be freed)
 int fty_shm_set_test_dir(const char* dir);
-
+// Clean the custom storage directory
 int fty_shm_delete_test_dir();
-
-void fty_shm_set_default_polling_interval(int val);
 
 void fty_shm_test(bool verbose);
 
@@ -77,6 +73,9 @@ namespace shm {
     {
         public :
             ~shmMetrics();
+            //If you use this, DO NOT DELETE the fty_proto_t. It will be take
+            //care by the shmlMetrics's destructor.
+            //  (same warning if you access to it using iterator)
             fty_proto_t* get(int index);
             fty_proto_t* getDup(int index);
             void add(fty_proto_t* metric);
@@ -94,59 +93,18 @@ namespace shm {
             std::vector<fty_proto_t*> m_metricsVector;
     };
 
-    typedef std::vector<std::string> Assets;
-    struct Metric {
-        std::string value;
-        std::string unit;
-    };
-    typedef std::unordered_map<std::string, Metric> Metrics;
-
-    int write_nut_metric(std::string asset, std::string metric, std::string value, int ttl);
-
     // C++ versions of fty_shm_write_metric()
     int write_metric(fty_proto_t* metric);
     int write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
-    inline int write_metric(const std::string& asset, const std::string& metric, const Metric& value, int ttl)
-    {
-        return write_metric(asset, metric, value.value, value.unit, ttl);
-    }
-    inline int write_metric(const std::string& asset, const std::string& metric, double value, const std::string& unit, int ttl)
-    {
-        return write_metric(asset, metric, std::to_string(value), unit, ttl);
-    }
-    inline int write_metric(const std::string& asset, const std::string& metric, int value, const std::string& unit, int ttl)
-    {
-        return write_metric(asset, metric, std::to_string(value), unit, ttl);
-    }
 
     // C++ version of fty_shm_read_metric()
-    int read_metric(const std::string& asset, const std::string& metric, std::string& value);
-    int read_metric(const std::string& asset, const std::string& metric, std::string& value, std::string& unit);
-    inline int read_metric(const std::string& asset, const std::string& metric, Metric& result)
-    {
-        return read_metric(asset, metric, result.value, result.unit);
-    }
+    int read_metric_value(const std::string& asset, const std::string& metric, std::string& value);
+    
+    //if return = 0 : create a fty_proto which correspond to the metric. Must be free by the caller.
+    int read_metric(const std::string& asset, const std::string& metric, fty_proto_t **proto_metric);
 
-    // C++ wrapper for fty_shm_delete_asset()
-    inline int delete_asset(const std::string& asset)
-    {
-        return fty_shm_delete_asset(asset.c_str());
-    }
-
-    // Fill the passed vector with assets known to the storage. Note that for
-    // optimization purposes, the result can also include assets with expired
-    // metrics. If there are no assets in the storage but the storage is
-    // accessible, returns an empty list.
-    // Returns 0 on success. On error, returns -1 sets errno accordingly and leaves
-    // the vector intact
-    //int find_assets(Assets& assets);
-
-    // Fill the passed map with metrics stored for this asset. Returns an error
-    // only if there is no valid metric for this asset.
-    // Returns 0 on success. On error, returns -1 and sets errno accordingly
-    int read_asset_metrics(const std::string& asset, Metrics& metrics);
-
-    int read_metrics(const std::string& familly, const std::string& asset, const std::string& type, shmMetrics& result);
+    //on success : fill result with the metrics still valid who matches the asset and metric filters.
+    int read_metrics(const std::string& asset, const std::string& metric, shmMetrics& result);
 }
 }
 

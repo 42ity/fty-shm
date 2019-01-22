@@ -124,14 +124,15 @@ find %{buildroot} -name '*.la' | xargs rm -f
 %{_mandir}/man1/fty-shm-cleanup*
 %config(noreplace) %{_sysconfdir}/fty-shm/fty-shm-cleanup.cfg
 %{SYSTEMD_UNIT_DIR}/fty-shm-cleanup.service
+%{SYSTEMD_UNIT_DIR}/fty-shm-cleanup.timer
 %dir %{_sysconfdir}/fty-shm
 %if 0%{?suse_version} > 1315
 %post
-%systemd_post fty-shm-cleanup.service
+%systemd_post fty-shm-cleanup.service fty-shm-cleanup.timer
 %preun
-%systemd_preun fty-shm-cleanup.service
+%systemd_preun fty-shm-cleanup.service fty-shm-cleanup.timer
 %postun
-%systemd_postun_with_restart fty-shm-cleanup.service
+%systemd_postun_with_restart fty-shm-cleanup.service fty-shm-cleanup.timer
 %endif
 
 %changelog
