@@ -88,7 +88,6 @@ void list_devices() {
 int main (int argc, char *argv [])
 {
     ManageFtyLog::setInstanceFtylog("fty-metric-cache-cli", "/etc/fty/ftyshmcli.cfg");
-    bool verbose = false;
     bool details = false;
     for (int argn = 1; argn < argc; argn++) {
         if (    streq (argv [argn], "--help")
