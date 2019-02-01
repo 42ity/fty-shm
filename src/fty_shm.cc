@@ -336,16 +336,12 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
 
 int fty_shm_read_family(const char* family, std::string asset, std::string type, fty::shm::shmMetrics& result)
 {
-  char* working_dir = (char*) malloc(250);
-  getcwd(working_dir, 250);
   std::string family_dir = shm_dir;
   family_dir.append("/");
   family_dir.append(family);
   DIR* dir;
   if(!(dir = opendir(family_dir.c_str())))
     return -1;
-  chdir(family_dir.c_str());
-  //fchdir(dirfd(dir));
   struct dirent* de;
 
   try {
@@ -360,7 +356,9 @@ int fty_shm_read_family(const char* family, std::string asset, std::string type,
       size_t type_name = delim - de->d_name;
       if(std::regex_match(std::string(delim+1), regAsset) && std::regex_match(std::string(de->d_name, type_name), regType)) {
         fty_proto_t *proto_metric = fty_proto_new(FTY_PROTO_METRIC);
-        if(read_data_metric(de->d_name, proto_metric) == 0) {
+        std::string filename(family_dir);
+        filename.append("/").append(de->d_name);
+        if(read_data_metric(filename.c_str(), proto_metric) == 0) {
           fty_proto_set_name(proto_metric, "%s", std::string(delim+1).c_str());
           fty_proto_set_type(proto_metric, "%s", std::string(de->d_name, type_name).c_str());
           result.add(proto_metric);
@@ -371,13 +369,9 @@ int fty_shm_read_family(const char* family, std::string asset, std::string type,
     }
   } catch(const std::regex_error& e) {
     closedir(dir);
-    chdir(working_dir);
-    free(working_dir);
     return -1;
   }
   closedir(dir);
-  chdir(working_dir);
-  free(working_dir);
   return 0;
 }
 
