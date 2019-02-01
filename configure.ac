@@ -966,6 +966,16 @@ AC_ARG_ENABLE([benchmark],
 AM_CONDITIONAL([ENABLE_BENCHMARK], [test x$enable_benchmark != xno])
 AM_COND_IF([ENABLE_BENCHMARK], [AC_MSG_NOTICE([ENABLE_BENCHMARK defined])])
 
+# Check for fty-shm-cli intent
+AC_ARG_ENABLE([fty-shm-cli],
+    AS_HELP_STRING([--enable-fty-shm-cli],
+        [Compile and install 'fty-shm-cli' [default=yes]]),
+    [enable_fty_shm_cli=$enableval],
+    [enable_fty_shm_cli=yes])
+
+AM_CONDITIONAL([ENABLE_FTY_SHM_CLI], [test x$enable_fty_shm_cli != xno])
+AM_COND_IF([ENABLE_FTY_SHM_CLI], [AC_MSG_NOTICE([ENABLE_FTY_SHM_CLI defined])])
+
 # Check for fty_shm_selftest intent
 AC_ARG_ENABLE([fty_shm_selftest],
     AS_HELP_STRING([--enable-fty_shm_selftest],

@@ -68,6 +68,13 @@ src_benchmark_LDADD = ${program_libs}
 src_benchmark_SOURCES = src/benchmark.cc
 endif #ENABLE_BENCHMARK
 
+if ENABLE_FTY_SHM_CLI
+bin_PROGRAMS += src/fty-shm-cli
+src_fty_shm_cli_CPPFLAGS = ${AM_CPPFLAGS}
+src_fty_shm_cli_LDADD = ${program_libs}
+src_fty_shm_cli_SOURCES = src/fty_shm_cli.cc
+endif #ENABLE_FTY_SHM_CLI
+
 if ENABLE_FTY_SHM_SELFTEST
 check_PROGRAMS += src/fty_shm_selftest
 noinst_PROGRAMS += src/fty_shm_selftest
@@ -80,6 +87,7 @@ endif #ENABLE_FTY_SHM_SELFTEST
 src: \
 		src/fty-shm-cleanup \
 		src/benchmark \
+		src/fty-shm-cli \
 		src/fty_shm_selftest \
 		src/libfty_shm.la
 
