@@ -7,6 +7,18 @@ memory (SHM). It provides a basic C api and a more full-featured C++ api. For
 any given metric, there can be any number of writers and readers and the
 library guarantees that the data will be consistent.
 
+## Client usage
+```
+fty-shm-cli [options]
+fty-shm-cli [--details / -d] device [filter] print all information about the device
+             device          device name or a regex
+             [filter]        regex filter to select specific metric name
+             --details / -d  will print full details metrics (fty_proto style) instead of one line style
+  --list / -l                print list of devices known by the agent
+  --verbose / -v             verbose output
+  --help / -h                this information
+```
+
 ## Environment variable
 
 This library use the environment variable FTY_SHM_AUTOCLEAN to decide if it 
@@ -23,7 +35,6 @@ It will overload the fty-nut.cfg if the value is a number > to 0.
 fty_shm_write_metric("myasset", "voltage", "230", "V", 300 /* TTL */);
 char *value, *unit;
 fty_shm_read_metric("myasset", "voltage", &value, &unit);
-fty_shm_delete_asset("myasset");
 ```
 
 ## C++ api
@@ -32,21 +43,44 @@ fty_shm_delete_asset("myasset");
 using namespace fty::shm;
 
 // All string arguments are of type std::string. Same error singalling as with the C api
-
 write_metric("myasset", "voltage", "230", "V", 300);
 std::string value, unit;
-read_metric("myasset", "voltage", value, unit);
-delete_asset("myasset");
+read_metric_value("myasset", "voltage", value, unit);
 
-Assets assets;
-if (find_assets(assets) < 0)
-    return;
-for (auto a : assets) {
-    Metrics metrics;
-    if (read_asset_metrics(a, metrics) < 0)
-	continue;
-    std::cout << "Asset: " << a << std::endl;
-    for (auto m : metrics)
-        std::cout << m.first << ": " << m.second.value << m.second.unit << std::endl;
+//will create and return the proto_metric containing the data of this metric or null.
+//Caller now owns proto and must destroy it when finished with it.
+fty_proto_t *proto_metric;
+read_metric("myasset", "voltage", &proto_metric);
+
+
+//write proto_metric as shm metric. Caller still owns proto.
+write_metric(metric);
+
+//Both of strings are regex
+//will fill the the shmMetrics with all metrics match the two regex.
+fty::shm::shmMetrics result;
+read_metrics(".*", "voltage", result);
+
+printf("Just found %d metrics", result.size());
+for(auto &metric : resultM) {
+    fty_proto_print(metric);
 }
+
+//Warning : do not delete the content of shmMetrics. It will be done automatically
+//at its delete.
+//If you want be the owner of some of the proto metrics contains in it, just use
+// resultM.getDup(index);
+
 ```
+## Utilities api
+
+```c
+// Use a custom storage directory for test purposes (the passed string must
+// not be freed)
+int fty_shm_set_test_dir(const char* dir);
+// Clean the custom storage directory (it do nothing if no test directory already set)
+int fty_shm_delete_test_dir();
+
+
+```
+
