@@ -122,6 +122,8 @@ find %{buildroot} -name '*.la' | xargs rm -f
 %doc README.md
 %{_bindir}/fty-shm-cleanup
 %{_mandir}/man1/fty-shm-cleanup*
+%{_bindir}/fty-shm-cli
+%{_mandir}/man1/fty-shm-cli*
 %config(noreplace) %{_sysconfdir}/fty-shm/fty-shm-cleanup.cfg
 %{SYSTEMD_UNIT_DIR}/fty-shm-cleanup.service
 %{SYSTEMD_UNIT_DIR}/fty-shm-cleanup.timer

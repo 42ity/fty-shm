@@ -11,4 +11,5 @@ Installation model
 
 <install>
     <item type = "systemd-tmpfiles" />
+    <item path = "/etc/fty/ftyshmcli.cfg" name = "ftyshmcli.cfg" package = "lib" />
 </install>

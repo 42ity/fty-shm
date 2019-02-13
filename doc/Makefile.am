@@ -6,7 +6,7 @@
 all-local: doc
 
 # Public programs ("main" tags in project.xml), auto-regenerated:
-MAN1 = fty-shm-cleanup.1
+MAN1 = fty-shm-cleanup.1 fty-shm-cli.1
 # Public classes ("class" tags in project.xml), auto-regenerated:
 MAN3 = fty_shm.3
 # Project overview, written by a human after initial skeleton:
@@ -75,6 +75,11 @@ GENERATED_DOCS += fty-shm-cleanup.txt fty-shm-cleanup.doc
 fty-shm-cleanup.txt: $(top_srcdir)/src/fty_shm_cleanup.cc
 	mkdir -p "$(builddir)/$(@D)"
 	"$(srcdir)/mkman" "fty_shm_cleanup" "$(builddir)/fty-shm-cleanup.txt" "$(srcdir)/.."
+
+GENERATED_DOCS += fty-shm-cli.txt fty-shm-cli.doc
+fty-shm-cli.txt: $(top_srcdir)/src/fty_shm_cli.cc
+	mkdir -p "$(builddir)/$(@D)"
+	"$(srcdir)/mkman" "fty_shm_cli" "$(builddir)/fty-shm-cli.txt" "$(srcdir)/.."
 
 
 clean-local:
