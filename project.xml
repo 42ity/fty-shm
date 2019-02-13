@@ -82,7 +82,7 @@
     <extra name = "internal.h" />
     <main name = "fty-shm-cleanup" service = "1" timer = "1" >Garbage collector for fty-shm</main>
     <main name = "benchmark" private = "1" >fty-shm benchmark</main>
-    <main name = "fty-shm-cli" > fty-shm cli </main>
+    <main name = "fty-shm-cli" >fty-shm cli</main>
     <!-- header name = "pokus" / -->
 
 </project>
