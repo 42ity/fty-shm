@@ -3,7 +3,7 @@ Installation model
 
     1. by path & name
     path - absolute path to the file
-    name - file name
+    name - file name (relative to src)
 
     2. type
     * systemd-tmpfiles  - install $(project.name) to /usr/lib/tmpfiles.d/
@@ -11,5 +11,5 @@ Installation model
 
 <install>
     <item type = "systemd-tmpfiles" />
-    <item path = "/etc/fty/ftyshmcli.cfg" name = "ftyshmcli.cfg" package = "lib" />
+    <item path = "/etc/fty/" name = "../ftyshmcli.cfg" package = "lib" />
 </install>
