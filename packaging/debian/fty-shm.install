@@ -2,5 +2,6 @@ usr/bin/fty-shm-cleanup
 usr/bin/fty-shm-cli
 etc/fty-shm/fty-shm-cleanup.cfg
 lib/systemd/system/fty-shm-cleanup.service
-/usr/lib/systemd/system/fty-shm-cleanup.timer
-
+lib/systemd/system/fty-shm-cleanup.timer
+# Note: Path to the timer unit above was fixed to match
+# the service unit and its actual installation by recipes
