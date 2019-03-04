@@ -24,6 +24,7 @@
 
 //  Include the project library file
 #include "fty_shm_library.h"
+#include <fty_proto.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,6 +43,8 @@ void fty_shm_set_default_polling_interval(int val);
 // where 0 means infinity
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
 int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl);
+
+int fty_shm_write_metric_proto(fty_proto_t* metric);
 
 // Retrieve a metric from shm. Caller must free the returned values.
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
@@ -65,7 +68,6 @@ void fty_shm_test(bool verbose);
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <fty_proto.h>
 
 namespace fty {
 namespace shm {
