@@ -495,6 +495,15 @@ int fty::shm::write_metric(fty_proto_t* metric)
     return write_metric_data(filename, metric);
 }
 
+int fty_shm_write_metric_proto(fty_proto_t* metric)
+{
+    char filename[PATH_MAX];
+
+    if (prepare_filename(filename, fty_proto_name(metric), strlen(fty_proto_name(metric)), fty_proto_type(metric), strlen(fty_proto_type(metric)), FTY_SHM_METRIC_TYPE) < 0)
+        return -1;
+    return write_metric_data(filename, metric);
+}
+
 int fty::shm::write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl)
 {
     char filename[PATH_MAX];
