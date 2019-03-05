@@ -85,6 +85,33 @@ void list_devices() {
    }
 }
 
+static zhash_t *
+    s_parse_aux (int argc, int argn, char *argv [])
+{
+    zhash_t *hash = zhash_new ();
+
+    for (int i = argn; i < argc; i++)
+    {
+        char *key = argv [i];
+
+        // skip ext. prefix there!
+        if (strncmp (key, "ext.", 4) == 0)
+            continue;
+
+        char *eq = strchr (key, '=');
+        if (eq == NULL) {
+            log_error ("Failed to parse '%s', missing =", key);
+            exit(1);
+        }
+
+        *eq = '\0';
+        char *value = eq+1;
+        zhash_update (hash, key, (void*) value);
+        *eq = '=';
+    }
+    return hash;
+}
+
 int main (int argc, char *argv [])
 {
     ManageFtyLog::setInstanceFtylog("fty-metric-cache-cli", "/etc/fty/ftyshmcli.cfg");
@@ -99,6 +126,7 @@ int main (int argc, char *argv [])
             puts ("             [filter]        regex filter to select specific metric name");
             puts ("             --details / -d  will print full details metrics (fty_proto style) instead of one line style");
             puts ("  --list / -l                print list of devices known to the agent");
+            puts ("  publish / pub \"metric\" type source value unit ttl [key=value]*       write a metric");
             puts ("  --verbose / -v             verbose output");
             puts ("  --help / -h                this information");
             break;
@@ -114,6 +142,60 @@ int main (int argc, char *argv [])
         {
             list_devices();
             break;
+        }
+        else
+        if (streq (argv[argn], "publish") || streq (argv[argn], "pub")) {
+            ++argn;
+            char *quantity = argv[++argn];
+            if (!quantity) {
+                log_error ("missing quantity");
+                break;
+            }
+            char *element_src = argv[++argn];
+            if (!element_src) {
+                log_error ("missing element_src");
+                break;
+            }
+            char *value = argv[++argn];
+            if (!value) {
+                log_error ("missing value");
+                break;
+            }
+            char *unit = argv[++argn];
+            if (!unit) {
+                log_error ("missing unit");
+                break;
+            }
+            char *s_ttl = argv[++argn];
+            if (!s_ttl) {
+                log_error ("missing TTL");
+                break;
+            }
+            uint32_t ttl;
+            int r = sscanf (s_ttl, "%" SCNu32, &ttl);
+            if (r < 1) {
+                log_error ("TTL %s is not a number", s_ttl);
+                break;
+            }
+
+            zhash_t *aux = s_parse_aux (argc, argn+1, argv);
+
+            zmsg_t *msg = fty_proto_encode_metric (
+                        aux,
+                        ::time (NULL),
+                        ttl,
+                        quantity,
+                        element_src,
+                        value,
+                        unit);
+
+            fty_proto_t *bmsg = fty_proto_decode (&msg);
+            if(fty::shm::write_metric(bmsg)< 0) {
+              puts("pasbo");
+            }
+            fty_proto_destroy(&bmsg);
+            zhash_destroy (&aux);
+            // to get all the threads behind enough time to send it
         }
         else {
             if (    streq (argv [argn], "--details")
