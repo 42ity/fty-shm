@@ -14,7 +14,16 @@ fty-shm-cli [--details / -d] device [filter] print all information about the dev
              device          device name or a regex
              [filter]        regex filter to select specific metric name
              --details / -d  will print full details metrics (fty_proto style) instead of one line style
-  --list / -l                print list of devices known by the agent
+  --list / -l                print list of devices known to the agent
+  publish metric <quantity> <element_src> <value> <units> <ttl>
+                         publish metric on shm
+                         <quantity> a string name for the metric type
+                         <element_src> a string name for asset where metric was detected
+                         <value> a string value of the metric (for now only values convertable to double should be used
+                         <units> a string like %, W, days
+                         <ttl>   a number time to leave [s]
+                         Auxilary data:
+                             quantity=Y, where Y is value
   --verbose / -v             verbose output
   --help / -h                this information
 ```

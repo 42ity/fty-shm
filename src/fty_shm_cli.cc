@@ -126,7 +126,15 @@ int main (int argc, char *argv [])
             puts ("             [filter]        regex filter to select specific metric name");
             puts ("             --details / -d  will print full details metrics (fty_proto style) instead of one line style");
             puts ("  --list / -l                print list of devices known to the agent");
-            puts ("  publish / pub \"metric\" type source value unit ttl [key=value]*       write a metric");
+            puts ("  publish metric <quantity> <element_src> <value> <units> <ttl>");
+            puts ("                         publish metric on shm");
+            puts ("                         <quantity> a string name for the metric type");
+            puts ("                         <element_src> a string name for asset where metric was detected");
+            puts ("                         <value> a string value of the metric (for now only values convertable to double should be used");
+            puts ("                         <units> a string like %, W, days");
+            puts ("                         <ttl>   a number time to leave [s]");
+            puts ("                         Auxilary data:");
+            puts ("                             quantity=Y, where Y is value");
             puts ("  --verbose / -v             verbose output");
             puts ("  --help / -h                this information");
             break;
