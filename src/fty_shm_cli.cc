@@ -116,6 +116,7 @@ int main (int argc, char *argv [])
 {
     ManageFtyLog::setInstanceFtylog("fty-metric-cache-cli", "/etc/fty/ftyshmcli.cfg");
     bool details = false;
+    int retvalue = 0;
     for (int argn = 1; argn < argc; argn++) {
         if (    streq (argv [argn], "--help")
              || streq (argv [argn], "-h"))
@@ -157,32 +158,38 @@ int main (int argc, char *argv [])
             char *quantity = argv[++argn];
             if (!quantity) {
                 log_error ("missing quantity");
+                retvalue=1;
                 break;
             }
             char *element_src = argv[++argn];
             if (!element_src) {
                 log_error ("missing element_src");
+                retvalue=1;
                 break;
             }
             char *value = argv[++argn];
             if (!value) {
                 log_error ("missing value");
+                retvalue=1;
                 break;
             }
             char *unit = argv[++argn];
             if (!unit) {
                 log_error ("missing unit");
+                retvalue=1;
                 break;
             }
             char *s_ttl = argv[++argn];
             if (!s_ttl) {
                 log_error ("missing TTL");
+                retvalue=1;
                 break;
             }
             uint32_t ttl;
             int r = sscanf (s_ttl, "%" SCNu32, &ttl);
             if (r < 1) {
                 log_error ("TTL %s is not a number", s_ttl);
+                retvalue=1;
                 break;
             }
 
@@ -199,7 +206,8 @@ int main (int argc, char *argv [])
 
             fty_proto_t *bmsg = fty_proto_decode (&msg);
             if(fty::shm::write_metric(bmsg)< 0) {
-              puts("pasbo");
+              log_error("Can't write the metric %s@%s", quantity, element_src);
+              retvalue=1;
             }
             fty_proto_destroy(&bmsg);
             zhash_destroy (&aux);
@@ -216,5 +224,5 @@ int main (int argc, char *argv [])
             break;
         }
     }
-    return 0;
+    return retvalue;
 }
