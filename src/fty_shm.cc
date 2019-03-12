@@ -120,17 +120,6 @@ static int prepare_filename(char* buf, const char* asset, size_t a_len, const ch
     return 0;
 }
 
-// Assumes len is small enough for the read to be atomic (i.e. <= 4k)
-static ssize_t read_buf(int fd, char* buf, size_t len)
-{
-    ssize_t ret = read(fd, buf, len);
-    if (ret >= 0 && static_cast<size_t>(ret) != len) {
-        errno = EIO;
-        return -1;
-    }
-    return ret;
-}
-
 // Write ttl and value to filename
 static int write_value(const char* filename, const char* value, const char* unit, int ttl)
 {
@@ -192,43 +181,55 @@ static int parse_ttl(char* ttl_str, time_t& ttl)
 template <typename T>
 static int read_value(const char* filename, T& value, T& unit, bool need_unit = true)
 {
-    int fd;
-    struct stat st;
-    char buf[HEADER_LEN + PAYLOAD_LEN];
-    time_t now, ttl;
-    int ret = -1;
+  int ret = -1;
+  struct stat st;
+  FILE* file = NULL;
+  char buf[128];
+  time_t now, ttl;
+  int len;
 
-    if ((fd = open(filename, O_RDONLY | O_CLOEXEC)) < 0)
-        return ret;
-    if (fstat(fd, &st) < 0)
-        goto out_fd;
-    if (read_buf(fd, buf, sizeof(buf)) < 0)
-        goto out_fd;
+  file = fopen(filename, "r");
+  if(file == NULL)
+    return -1;
+  if(fstat(fileno(file), &st) < 0)
+    goto shm_out_fd;
 
-    buf[TTL_LEN - 1] = '\0';
-    if (parse_ttl(buf, ttl) < 0)
-        goto out_fd;
-    if (ttl) {
+  //get ttl
+  fgets(buf, sizeof(buf), file);
+
+  if (parse_ttl(buf, ttl) < 0)
+    goto shm_out_fd;
+
+  //data still valid ?
+  if (ttl) {
         now = time(NULL);
         if (now - st.st_mtime > ttl) {
             errno = ESTALE;
-            goto out_fd;
+            fclose(file);
+            char *valenv = getenv("FTY_SHM_AUTOCLEAN");
+            if(!valenv || strcmp(valenv, "OFF") != 0)
+              remove(filename);
+            return -1;
         }
-    }
-    if (need_unit) {
-        char *unit_buf = buf + TTL_LEN;
-        // Trim the padding spaces
-        int i = UNIT_LEN - 1;
-        while (unit_buf[i] == ' ' || unit_buf[i] == '\n')
-            --i;
-        unit_buf[i + 1] = '\0';
-        unit = dup_str(unit_buf, T());
-    }
-    value = dup_str(buf + HEADER_LEN, T());
-    ret = 0;
+  }
 
-out_fd:
-    close(fd);
+  //get unit
+  fgets(buf, sizeof(buf), file);
+  // Delete the '\n'
+  len = strlen(buf) -1;
+  if(buf[len] == '\n')
+    buf[len] = '\0';
+  if (need_unit) {
+    unit = dup_str(buf, T());
+  }
+  //get value
+  fgets(buf, sizeof(buf), file);
+  value = dup_str(buf, T());
+  fclose(file);
+  return 0;
+
+shm_out_fd:
+    fclose(file);
     return ret;
 }
 
