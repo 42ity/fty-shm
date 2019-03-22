@@ -56,13 +56,7 @@
 #define TTL_FMT "%010d\n"
 #define TTL_LEN 11
 
-// The next 11 bytes specify the unit of the metric, right-padded with spaces
-// and followed by \n
-#define UNIT_FMT "%-10.10s\n"
-#define UNIT_LEN 11
-
-#define HEADER_LEN (TTL_LEN + UNIT_LEN)
-#define PAYLOAD_LEN (128 - HEADER_LEN)
+#define UNIT_FMT "%s\n"
 
 // Convenience macros
 #define FREE(x) (free(x), (x) = NULL)
@@ -123,29 +117,17 @@ static int prepare_filename(char* buf, const char* asset, size_t a_len, const ch
 // Write ttl and value to filename
 static int write_value(const char* filename, const char* value, const char* unit, int ttl)
 {
-    int fd;
-    char buf[HEADER_LEN + PAYLOAD_LEN];
-    size_t value_len;
-    int err = 0;
-
-    value_len = strlen(value);
-    if (value_len > PAYLOAD_LEN) {
-        errno = EINVAL;
-        return -1;
-    }
-    if ((fd = open(filename, O_CREAT | O_RDWR | O_CLOEXEC, 0666)) < 0)
-        return -1;
+    FILE* file = fopen(filename, "w");
+    if(file == NULL)
+      return -1;
     if (ttl < 0)
         ttl = 0;
-    sprintf(buf, TTL_FMT, ttl);
-    sprintf(buf + TTL_LEN, UNIT_FMT, unit);
-    memcpy(buf + HEADER_LEN, value, value_len);
-    memset(buf + HEADER_LEN + value_len, 0, sizeof(buf) - HEADER_LEN - value_len);
-    if (pwrite(fd, buf, sizeof(buf), 0) < 0)
-        err = -1;
-    if (close(fd) < 0)
-        err = -1;
-    return err;
+    std::string fmt(TTL_FMT);
+    fmt.append(UNIT_FMT).append("%s");
+    fprintf(file, fmt.c_str(), ttl, unit, value);
+    if(fclose(file) < 0)
+      return -1;
+    return 0;
 }
 
 static char* dup_str(char *str, char*)
