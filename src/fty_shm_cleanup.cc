@@ -57,7 +57,7 @@ int parse_ttl(char* ttl_str, time_t& ttl)
 // -1 : not a valid metric/data
 //  0 : outdated data
 //  1 : up to date data
-bool clean_outdated_data(std::string filename) {
+int clean_outdated_data(std::string filename) {
   struct stat st;
   char buf[128];
   time_t now, ttl;
