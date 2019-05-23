@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <fty-log/fty_logger.h>
 
 #define TTL_LEN 11
 
@@ -56,11 +57,16 @@ int parse_ttl(char* ttl_str, time_t& ttl)
 // -1 : not a valid metric/data
 //  0 : outdated data
 //  1 : up to date data
-bool clean_outdated_data(std::string filename) {
+int clean_outdated_data(std::string filename) {
   struct stat st;
   char buf[128];
   time_t now, ttl;
   FILE* file = fopen(filename.c_str(), "r");
+
+  if (!file) {
+    log_error("Cannot open %s for cleaning", filename.c_str());
+    return -1;
+  }
 
   if(fstat(fileno(file), &st) < 0) {
     fclose(file);
@@ -145,9 +151,9 @@ int main(int argc, char* argv[])
     }
     //  Insert main code here
     if (verbose)
-        std::cout << "fty_shm_cleanup - Garbage collector for fty-shm" << std::endl;
+        log_debug ("fty-shm-cleanup - Garbage collector for fty-shm");
 
     if (fty_shm_cleanup(path, verbose) < 0)
-        std::cerr << "fty-shm cleanup returned error: " << strerror(errno) << std::endl;
+        log_error ("fty-shm cleanup returned error: %s", strerror(errno));
     return 0;
 }
