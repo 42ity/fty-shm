@@ -12,6 +12,9 @@
     <target name = "debian" />
     <target name = "redhat" />
     <target name = "travis" >
+        <!-- Force to use trusty because we still depend of auto_ptr :( -->
+        <option name = "dist" value = "trusty" />
+        <option name = "shadow_gcc" value = "2" />
         <!-- option name = "clangformat_implem" value = "autotools" / -->
         <option name = "use_cmake" value = "0" />
         <!-- option name = "clangformat_require_good" value = "1" / -->

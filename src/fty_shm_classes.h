@@ -32,9 +32,9 @@
 //  External API
 #include "../include/ftyshm.h"
 
-//  Extra headers
-
 //  Opaque class structures to allow forward references
+
+//  Extra headers
 
 //  Internal API
 // common definitions and idioms from czmq_prelude.h, which are used in generated code
