@@ -37,6 +37,7 @@
         <option name = "use_checkout_explicit" value = "1" />
     </target>
 
+    <classfilename use-cxx-gcc-4-9 = "true" />
     <include filename = "license.xml" />
     <version major = "1" minor = "0" patch = "0" />
     <abi current = "0" revision = "0" age = "0" />
