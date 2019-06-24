@@ -12,7 +12,7 @@
     <target name = "debian" />
     <target name = "redhat" />
     <target name = "travis" >
-        <!-- Force to use trusty because we still depend of auto_ptr :( -->
+        <!-- Force to use trusty because we still depend on auto_ptr :( -->
         <option name = "dist" value = "trusty" />
         <option name = "shadow_gcc" value = "2" />
         <!-- option name = "clangformat_implem" value = "autotools" / -->
