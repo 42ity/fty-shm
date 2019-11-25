@@ -16,10 +16,11 @@ AM_CPPFLAGS = \
     ${czmq_CFLAGS} \
     ${malamute_CFLAGS} \
     ${fty_proto_CFLAGS} \
+    ${fty_common_logging_CFLAGS} \
     -D__STDC_FORMAT_MACROS \
     -I$(srcdir)/include
 
-project_libs = ${libzmq_LIBS} ${czmq_LIBS} ${malamute_LIBS} ${fty_proto_LIBS}
+project_libs = ${libzmq_LIBS} ${czmq_LIBS} ${malamute_LIBS} ${fty_proto_LIBS} ${fty_common_logging_LIBS}
 
 SUBDIRS = doc
 SUBDIRS += include
@@ -44,6 +45,7 @@ EXTRA_DIST += \
     Findczmq.cmake \
     Findmalamute.cmake \
     Findfty_proto.cmake \
+    Findfty_common_logging.cmake \
     builds/cmake/Modules/ClangFormat.cmake \
     builds/cmake/clang-format-check.sh.in \
     builds/cmake/Config.cmake.in \

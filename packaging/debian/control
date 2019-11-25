@@ -28,6 +28,7 @@ Build-Depends: debhelper (>= 9),
     libczmq-dev,
     libmlm-dev,
     libfty-proto-dev (>= 1.0.0),
+    libfty-common-logging-dev,
     gcc (>= 4.9.0), g++ (>= 4.9.0),
     systemd,
     dh-systemd,
@@ -50,6 +51,7 @@ Depends:
     libczmq-dev,
     libmlm-dev,
     libfty-proto-dev (>= 1.0.0),
+    libfty-common-logging-dev,
     libfty-shm0 (= ${binary:Version})
 Description: fty-shm development tools
  This package contains development files for fty-shm:

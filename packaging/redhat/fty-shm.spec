@@ -59,6 +59,7 @@ BuildRequires:  zeromq-devel
 BuildRequires:  czmq-devel
 BuildRequires:  malamute-devel
 BuildRequires:  fty-proto-devel >= 1.0.0
+BuildRequires:  fty-common-logging-devel
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
@@ -86,6 +87,7 @@ Requires:       zeromq-devel
 Requires:       czmq-devel
 Requires:       malamute-devel
 Requires:       fty-proto-devel >= 1.0.0
+Requires:       fty-common-logging-devel
 
 %description devel
 lockless metric sharing library for 42ity development tools

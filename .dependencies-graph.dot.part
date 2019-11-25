@@ -2,3 +2,4 @@
    fty-shm -> czmq;
    fty-shm -> malamute;
    fty-shm -> fty-proto;
+   fty-shm -> fty-common-logging;
