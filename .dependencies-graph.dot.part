@@ -1,0 +1,4 @@
+   fty-shm -> libzmq;
+   fty-shm -> czmq;
+   fty-shm -> malamute;
+   fty-shm -> fty-proto;

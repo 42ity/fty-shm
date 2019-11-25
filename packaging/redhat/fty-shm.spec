@@ -55,12 +55,9 @@ BuildRequires:  xmlto
 # "4.9 or newer".
 BuildRequires:  devtoolset-3-gcc devtoolset-3-gcc-c++
 BuildRequires:  gcc-c++ >= 4.9.0
-BuildRequires:  libsodium-devel
 BuildRequires:  zeromq-devel
-BuildRequires:  czmq-devel >= 3.0.2
-BuildRequires:  malamute-devel >= 1.0.0
-BuildRequires:  log4cplus-devel
-BuildRequires:  fty-common-logging-devel
+BuildRequires:  czmq-devel
+BuildRequires:  malamute-devel
 BuildRequires:  fty-proto-devel >= 1.0.0
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
@@ -85,12 +82,9 @@ This package contains shared library for fty-shm: lockless metric sharing librar
 Summary:        lockless metric sharing library for 42ity
 Group:          System/Libraries
 Requires:       libfty_shm0 = %{version}
-Requires:       libsodium-devel
 Requires:       zeromq-devel
-Requires:       czmq-devel >= 3.0.2
-Requires:       malamute-devel >= 1.0.0
-Requires:       log4cplus-devel
-Requires:       fty-common-logging-devel
+Requires:       czmq-devel
+Requires:       malamute-devel
 Requires:       fty-proto-devel >= 1.0.0
 
 %description devel
