@@ -31,6 +31,7 @@
 
 //  External dependencies
 #include <ftyproto.h>
+#include <fty_log.h>
 
 //  FTY_SHM version macros for compile-time API detection
 #define FTY_SHM_VERSION_MAJOR 1
