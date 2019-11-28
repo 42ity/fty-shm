@@ -392,7 +392,7 @@ int fty_shm_delete_test_dir()
   while (entry != NULL)
   {
     FILE *file = NULL;
-    char abs_path[255] = {0};
+    char abs_path[2048] = {0};
     if(strstr(entry->d_name, "@") != NULL )
     {
       
