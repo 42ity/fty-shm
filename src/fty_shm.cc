@@ -260,7 +260,7 @@ int read_data_metric(const char* filename, fty_proto_t *proto_metric) {
   len = strlen(buf) -1;
   if(buf[len] == '\n')
     buf[len] = '\0';
-  fty_proto_set_unit(proto_metric, buf);
+  fty_proto_set_unit(proto_metric, "%s", buf); // unit can be "%" (ex.: load.default@ups-xxx)
 
   //get value
   fgets(buf, sizeof(buf), file);
