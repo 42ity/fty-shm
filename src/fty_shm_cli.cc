@@ -114,8 +114,13 @@ static zhash_t *
 
 int main (int argc, char *argv [])
 {
-    ManageFtyLog::setInstanceFtylog("fty-metric-cache-cli", "/etc/fty/ftyshmcli.cfg");
-    bool details = false;
+    ManageFtyLog::setInstanceFtylog("fty-shm-cli", "/etc/fty/ftyshmcli.cfg");
+
+    if (argc == 1) {
+        log_error("Missing argument(s). Retry with --help for details");
+        return 1;
+    }
+
     int retvalue = 0;
     for (int argn = 1; argn < argc; argn++) {
         if (    streq (argv [argn], "--help")
@@ -154,7 +159,12 @@ int main (int argc, char *argv [])
         }
         else
         if (streq (argv[argn], "publish") || streq (argv[argn], "pub")) {
-            ++argn;
+            char *token = argv[++argn];
+            if (!(token && streq(token, "metric"))) {
+                log_error ("'metric' argument is required (got '%s')", token);
+                retvalue=1;
+                break;
+            }
             char *quantity = argv[++argn];
             if (!quantity) {
                 log_error ("missing quantity");
@@ -214,13 +224,22 @@ int main (int argc, char *argv [])
             // to get all the threads behind enough time to send it
         }
         else {
+            bool details = false;
             if (    streq (argv [argn], "--details")
                   || streq (argv [argn], "-d")) {
               details = true;
               argn++;
             }
-            const char* filter=(argn==(argc-2))?argv[argn+1]:".*";
-            print_device(argv [argn], filter, details);
+
+            if (argn >= argc) {
+                log_error ("Missing argument.");
+                retvalue=1;
+                break;
+            }
+
+            const char* filter = (argn < (argc-1)) ? argv[argn++] : ".*";
+            char *asset = argv [argn];
+            print_device(asset, filter, details);
             break;
         }
     }
