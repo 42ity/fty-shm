@@ -117,7 +117,7 @@ int main (int argc, char *argv [])
     ManageFtyLog::setInstanceFtylog("fty-shm-cli", "/etc/fty/ftyshmcli.cfg");
 
     if (argc == 1) {
-        log_error("Missing argument(s). Retry with --help for details);
+        log_error("Missing argument(s). Retry with --help for details");
         return 1;
     }
 
