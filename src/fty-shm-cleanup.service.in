@@ -1,7 +1,9 @@
 [Unit]
 Description=fty-shm-cleanup service, one run = one cleanup
 After=network.target
-PartOf=bios.target
+# We can have some services using message bus even before EULA
+# is accepted; care for their SHM even at this time
+PartOf=bios-pre-eula.target
 
 [Service]
 # This service runs the cleanup routine and exits
@@ -13,4 +15,4 @@ User=bios
 ExecStart=@prefix@/bin/fty-shm-cleanup
 
 [Install]
-WantedBy=bios.target
+WantedBy=bios-pre-eula.target
