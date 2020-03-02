@@ -1,12 +1,15 @@
 [Unit]
-Description=fty-shm-cleanup service
+Description=fty-shm-cleanup service, one run = one cleanup
 After=network.target
 PartOf=bios.target
 
 [Service]
-Type=simple
+# This service runs the cleanup routine and exits
+# It is started by timer, so no need to restart automatically
+# (in fact systemd throttles that as a loop too quick) nor to
+# keep it fake-active as RemainAfterExit=yes.
+Type=oneshot
 User=bios
-Restart=always
 ExecStart=@prefix@/bin/fty-shm-cleanup
 
 [Install]
