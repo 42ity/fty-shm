@@ -1,6 +1,6 @@
 [Unit]
 Description=Timer to regularly trigger the job done by fty-shm-cleanup service
-PartOf=bios.target
+PartOf=bios-pre-eula.target
 
 [Timer]
 ### Run every night
@@ -9,4 +9,4 @@ OnCalendar=*-*-* 04:20:00
 Persistent=false
 
 [Install]
-WantedBy=bios.target
+WantedBy=bios-pre-eula.target
