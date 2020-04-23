@@ -1,7 +1,7 @@
 /*  =========================================================================
     fty_shm_cli - fty-shm cli
 
-    Copyright (C) 2018 Eaton
+    Copyright (C) 2018 - 2020 Eaton
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
