@@ -1,5 +1,5 @@
 [Unit]
-Description=Timer to regularly trigger the job done by fty-shm-cleanup service
+Description=Timer to regularly trigger the job done by @TARGET_NAME@ service
 PartOf=bios-pre-eula.target
 
 [Timer]

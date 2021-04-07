@@ -32,11 +32,11 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <fty-log/fty_logger.h>
+#include <fty_log.h>
 
 #define TTL_LEN 11
 
-int parse_ttl(char* ttl_str, time_t& ttl)
+static int parse_ttl(char* ttl_str, time_t& ttl)
 {
     char *err;
     int res;
@@ -55,12 +55,9 @@ int parse_ttl(char* ttl_str, time_t& ttl)
 }
 
 // -1 : not a valid metric/data
-//  0 : outdated data
+//  0 : outdated data (file removed)
 //  1 : up to date data
-int clean_outdated_data(std::string filename) {
-  struct stat st;
-  char buf[128];
-  time_t now, ttl;
+static int clean_outdated_data(std::string filename) {
   FILE* file = fopen(filename.c_str(), "r");
 
   if (!file) {
@@ -68,25 +65,29 @@ int clean_outdated_data(std::string filename) {
     return -1;
   }
 
+  struct stat st;
   if(fstat(fileno(file), &st) < 0) {
     fclose(file);
     return -1;
   }
 
-  //get ttl
+  //read file in buf
+  char buf[128] = "";
   fgets(buf, sizeof(buf), file);
-  
+  fclose(file);
+  file = NULL;
+
+  //get ttl
+  time_t ttl = 0;
   if (parse_ttl(buf, ttl) < 0) {
-    fclose(file);
     return -1;
   }
 
   //data still valid ?
   if (ttl) {
-        now = time(NULL);
-        if (now - st.st_mtime > ttl) {
+        time_t now = time(NULL);
+        if ((now - st.st_mtime) > ttl) {
             errno = ESTALE;
-            fclose(file);
             remove(filename.c_str());
             return 0;
         }
@@ -94,7 +95,7 @@ int clean_outdated_data(std::string filename) {
   return 1;
 }
 
-int fty_shm_cleanup(std::string directory_path, bool verbose) {
+static int fty_shm_cleanup(std::string directory_path, bool /*verbose*/) {
   DIR *dir;
   struct dirent *ent;
   if ((dir = opendir (directory_path.c_str())) != NULL) {
@@ -127,7 +128,7 @@ int main(int argc, char* argv[])
         { "help", no_argument, 0, 'h' },
         { "verbose", no_argument, 0, 'v' }
     };
-    
+
     std::string path("/run/42shm");
 
     int c = 0;
@@ -155,5 +156,6 @@ int main(int argc, char* argv[])
 
     if (fty_shm_cleanup(path, verbose) < 0)
         log_error ("fty-shm cleanup returned error: %s", strerror(errno));
+
     return 0;
 }

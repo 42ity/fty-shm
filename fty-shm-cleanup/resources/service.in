@@ -1,0 +1,27 @@
+[Unit]
+Description=@TARGET_NAME@ service, one run = one cleanup
+After=network.target
+# We can have some services using message bus even before EULA
+# is accepted; care for their SHM even at this time
+PartOf=bios-pre-eula.target
+
+[Service]
+# This service runs the cleanup routine and exits
+# It is started by timer, so no need to restart automatically
+# (in fact systemd throttles that as a loop too quick) nor to
+# keep it fake-active as RemainAfterExit=yes.
+Type=oneshot
+User=@SERVICE_USER@
+EnvironmentFile=-/usr/share/bios/etc/default/bios
+EnvironmentFile=-/usr/share/bios/etc/default/bios__%n.conf
+EnvironmentFile=-/usr/share/fty/etc/default/fty
+EnvironmentFile=-/usr/share/fty/etc/default/fty__%n.conf
+EnvironmentFile=-/etc/default/bios
+EnvironmentFile=-/etc/default/bios__%n.conf
+EnvironmentFile=-/etc/default/fty
+EnvironmentFile=-/etc/default/fty__%n.conf
+Environment="prefix=/usr"
+ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/@TARGET_NAME@
+
+[Install]
+WantedBy=bios-pre-eula.target
