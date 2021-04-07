@@ -26,25 +26,11 @@
 @end
 */
 
-#include <algorithm>
 #include <assert.h>
-#include <dirent.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <limits.h>
-#include <linux/fs.h>
-#include <random>
 #include <string.h>
-#include <sys/syscall.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <unordered_set>
 #include <regex>
-#include <iostream>
-#include <map>
 
 #include "fty_shm.h"
-#include "internal.h"
 
 #define DEFAULT_SHM_DIR "/run/42shm"
 
@@ -232,7 +218,7 @@ int read_data_metric(const char* filename, fty_proto_t *proto_metric) {
 
   //get ttl
   fgets(buf, sizeof(buf), file);
-  
+
   if (parse_ttl(buf, ttl) < 0)
     goto shm_out_fd;
 
@@ -395,7 +381,7 @@ int fty_shm_delete_test_dir()
     char abs_path[2048] = {0};
     if(strstr(entry->d_name, "@") != NULL )
     {
-      
+
       sprintf(abs_path, "%s/%s", metric_dir.c_str(), entry->d_name);
       file = fopen(abs_path, "r");
       if(file != NULL)
@@ -425,14 +411,14 @@ int fty_shm_set_test_dir(const char* dir)
       closedir(dird);
     if(ret != 0)
       return ret;
-    
+
     std::string subdir(dir);
     subdir.append("/").append(FTY_SHM_METRIC_TYPE);
     if(!(dird = opendir(subdir.c_str())))
       ret = mkdir(subdir.c_str(), 0777);
     else
       closedir(dird);
-    
+
     if(ret != 0)
       return ret;
     shm_dir = dir;
@@ -512,7 +498,7 @@ int fty::shm::read_metric(const std::string& asset, const std::string& metric, f
   }
 
   char filename[PATH_MAX];
-  
+
   if (prepare_filename(filename, asset.c_str(), asset.length(), metric.c_str(), metric.length(), FTY_SHM_METRIC_TYPE) < 0)
       return -1;
 
@@ -564,12 +550,17 @@ void fty::shm::shmMetrics::add(fty_proto_t* metric) {
         }                                                                 \
     } while (0)
 
+// test outputs directory
+#define SELFTEST_RW "selftest-rw"
+
 void fty_shm_test(bool verbose)
 {
+  printf(" * fty_shm_test: \n");
+
   std::string value;
   fty_proto_t *proto_metric, *proto_metric_result;
 
-  assert(fty_shm_set_test_dir("src/selftest-rw") == 0);
+  assert(fty_shm_set_test_dir(SELFTEST_RW) == 0);
 
   assert(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
 
@@ -619,7 +610,7 @@ void fty_shm_test(bool verbose)
   fty_proto_destroy(&proto_metric_result);
   fty_proto_destroy(&proto_metric);
   printf("#2 write-read full proto : OK\n");
-  
+
   zclock_sleep(3000);
 
   //test metric "update"
@@ -658,7 +649,7 @@ void fty_shm_test(bool verbose)
         if(streq(resultT, "metric") == 0) {
           result = (char*) fty_proto_value(metric);
           assert(result!=NULL && (streq (result, "here_is_my_value") == 0));
-        } else {        
+        } else {
           result = (char*) fty_proto_value(metric);
           assert(result!=NULL && (streq (result, "here_is_my_value_2") == 0));
         }
@@ -666,7 +657,7 @@ void fty_shm_test(bool verbose)
         if(streq(resultT, "metric2") == 0) {
           result = (char*) fty_proto_value(metric);
           assert(result!=NULL && (streq (result, "here_is_my_other_value") == 0));
-        } else {        
+        } else {
           result = (char*) fty_proto_value(metric);
           assert(result!=NULL && (streq (result, "here_is_my_other_value_2") == 0));
         }
@@ -720,13 +711,13 @@ void fty_shm_test(bool verbose)
 
   //verify the autoclean
   assert(fty::shm::write_metric("long", "duration", "here_the_metric", "stand", 10) == 0);
-  
+
   //get the number of "file" in the directory
   DIR *dir;
   struct dirent *ent;
   int dir_number = 0;
-  std::string dir_metric("src/selftest-rw/");
-  dir_metric.append(FTY_SHM_METRIC_TYPE);
+  std::string dir_metric(SELFTEST_RW);
+  dir_metric.append("/").append(FTY_SHM_METRIC_TYPE);
   if ((dir = opendir (dir_metric.c_str())) != NULL) {
     while ((ent = readdir (dir)) != NULL) {
       dir_number++;
@@ -737,19 +728,19 @@ void fty_shm_test(bool verbose)
     perror ("");
     assert(false);
   }
-  
-  
+
+
   //we must have file number egals to number_of_metric + 2 (. and ..)
   assert(dir_number == 11);
   //wait the expiration of some metrics
   zclock_sleep(6000);
-  
+
   {
     fty::shm::shmMetrics resultM;
     fty::shm::read_metrics(".*", ".*", resultM);
     assert(resultM.size() == 1);
   }
-  
+
   //get the new number of "files"
   dir_number = 0;
   if ((dir = opendir (dir_metric.c_str())) != NULL) {
@@ -762,12 +753,11 @@ void fty_shm_test(bool verbose)
     perror ("");
     assert(false);
   }
-  
+
   //only one metric file left
   assert(dir_number == 3);
   printf("#6 Autoclean : OK\n");
-
   fty_shm_delete_test_dir();
 
-  printf("OK\n");
+  printf(" * fty_shm_test: OK\n");
 }

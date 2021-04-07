@@ -22,8 +22,6 @@
 #ifndef FTY_SHM_H_H_INCLUDED
 #define FTY_SHM_H_H_INCLUDED
 
-//  Include the project library file
-#include "fty_shm_library.h"
 #include <fty_proto.h>
 
 #ifdef __cplusplus
@@ -31,9 +29,11 @@ extern "C" {
 #endif
 
 #define FTY_SHM_METRIC_TYPE "0"
+
 //currently here until it can be merge in a fty_common* lib
 int fty_get_polling_interval();
 void fty_shm_set_default_polling_interval(int val);
+
 // This is the basic C API of the library. It allows to store and retrieve
 // individual metrics.
 
@@ -101,14 +101,14 @@ namespace shm {
 
     // C++ version of fty_shm_read_metric()
     int read_metric_value(const std::string& asset, const std::string& metric, std::string& value);
-    
+
     //if return = 0 : create a fty_proto which correspond to the metric. Must be free by the caller.
     int read_metric(const std::string& asset, const std::string& metric, fty_proto_t **proto_metric);
 
     //on success : fill result with the metrics still valid who matches the asset and metric filters.
     int read_metrics(const std::string& asset, const std::string& metric, shmMetrics& result);
-}
-}
+}//namespace shm
+}//namespace fty
 
 #endif // __cplusplus
 
