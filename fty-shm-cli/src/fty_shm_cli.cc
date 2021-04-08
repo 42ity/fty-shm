@@ -26,9 +26,15 @@
 @end
 */
 
-#include "fty_shm_classes.h"
-#include <fty-log/fty_logger.h>
+#include <string>
 #include <unordered_map>
+
+#include <fty_log.h>
+#include <fty_proto.h>
+#include <malamute.h>
+#include <czmq.h>
+
+#include "fty_shm.h"
 
 void print_device(const char *device, const char* filter, bool details){
    std::unordered_map<std::string, std::vector<fty_proto_t*>> list;
@@ -67,7 +73,6 @@ void print_device(const char *device, const char* filter, bool details){
       }
    }
 }
-
 
 void list_devices() {
    std::unordered_map<std::string, bool> list;
@@ -114,7 +119,7 @@ static zhash_t *
 
 int main (int argc, char *argv [])
 {
-    ManageFtyLog::setInstanceFtylog("fty-shm-cli", "/etc/fty/ftyshmcli.cfg");
+    ManageFtyLog::setInstanceFtylog("fty-shm-cli", "/etc/fty-shm-cli/fty-shm-cli.logger");
 
     if (argc == 1) {
         log_error("Missing argument(s). Retry with --help for details");

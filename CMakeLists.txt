@@ -16,3 +16,6 @@ add_subdirectory(lib)
 
 # fty-shm-cleanup
 add_subdirectory(fty-shm-cleanup)
+
+# fty-shm-cli
+add_subdirectory(fty-shm-cli)
