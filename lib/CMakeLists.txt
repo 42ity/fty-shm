@@ -9,10 +9,11 @@ etn_target(shared ${PROJECT_NAME}
         src/*.cc
         src/*.h
     PUBLIC_INCLUDE_DIR
-        include_public
+        public_include
     PUBLIC_HEADERS
         fty_shm.h
     USES
+        czmq
         fty_proto
 )
 
