@@ -26,7 +26,8 @@
 @end
 */
 
-#include <fty_shm.h>
+#include "fty_shm.h"
+
 #include <getopt.h>
 #include <iomanip>
 #include <iostream>
@@ -182,7 +183,7 @@ void Benchmark::cpp_api_bench()
         for (i = 0; i < NUM_METRICS; i++)
             fty::shm::read_metric_value("bench_asset", names[i], res_value);
         timestamp("reads value");
-        
+
         fty_proto_t *proto;
         for (i = 0; i < NUM_METRICS; i++) {
           fty::shm::read_metric("bench_asset", names[i], &proto);
