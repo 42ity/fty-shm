@@ -45,4 +45,7 @@ if (BUILD_TESTING)
     #enable coverage
     etn_coverage(${PROJECT_NAME}-test)
 
+    #build selftest-rw/0 for test outputs (see FTY_SHM_METRIC_TYPE)
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/selftest-rw/0)
+
 endif()
