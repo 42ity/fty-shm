@@ -1,5 +1,4 @@
 usr/bin/fty-shm-cleanup
-usr/lib/systemd/system/fty-shm-cleanup.service
-usr/lib/systemd/system/fty-shm-cleanup.timer
+usr/lib/systemd/system/fty-shm-cleanup* lib/systemd/system
 usr/bin/fty-shm-cli
 etc/fty-shm-cli/fty-shm-cli.logger

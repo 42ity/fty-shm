@@ -119,11 +119,12 @@ static zhash_t *
 
 int main (int argc, char *argv [])
 {
-    ManageFtyLog::setInstanceFtylog("fty-shm-cli", "/etc/fty-shm-cli/fty-shm-cli.logger");
+    const std::string LOGGER{"/etc/fty-shm-cli/fty-shm-cli.logger"};
+    ManageFtyLog::setInstanceFtylog("fty-shm-cli", LOGGER);
 
     if (argc == 1) {
         log_error("Missing argument(s). Retry with --help for details");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     int retvalue = 0;
@@ -148,12 +149,13 @@ int main (int argc, char *argv [])
             puts ("                             quantity=Y, where Y is value");
             puts ("  --verbose / -v             verbose output");
             puts ("  --help / -h                this information");
+            printf ("  (Logger: %s)\n", LOGGER.c_str());
             break;
         }
         else
         if (streq (argv [argn], "--verbose")
         ||  streq (argv [argn], "-v")) {
-            ManageFtyLog::getInstanceFtylog()->setVeboseMode();
+            ManageFtyLog::getInstanceFtylog()->setVerboseMode();
         }
         else
         if (    streq (argv [argn], "--list")
@@ -248,5 +250,6 @@ int main (int argc, char *argv [])
             break;
         }
     }
-    return retvalue;
+
+    return (retvalue == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
