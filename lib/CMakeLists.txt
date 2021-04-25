@@ -17,9 +17,10 @@ etn_target(shared ${PROJECT_NAME}
         fty_proto
 )
 
+# -- see fty-shm-cleanup/resources .conf file --
 #create run/42shm/0 (see FTY_SHM_METRIC_TYPE)
-#FIXME owner & privileges: /run/42shm/0 0777 bios root
-install(DIRECTORY DESTINATION ${CMAKE_INSTALL_PREFIX}/run/42shm/0)
+#owner & privileges: /run/42shm/0 0777 bios root
+#install(DIRECTORY DESTINATION /run/42shm/0)
 
 if (BUILD_TESTING)
 
