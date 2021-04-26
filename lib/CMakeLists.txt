@@ -24,13 +24,11 @@ etn_target(shared ${PROJECT_NAME}
 
 if (BUILD_TESTING)
 
-    etn_test(${PROJECT_NAME}-test
+    etn_test_target(${PROJECT_NAME}
         SOURCES
             tests/main.cc
             src/*.cc
             src/*.h
-        INCLUDE_DIR
-            include_public
         PREPROCESSOR -DCATCH_CONFIG_FAST_COMPILE
         USES
             czmq
@@ -40,11 +38,13 @@ if (BUILD_TESTING)
             log4cplus
     )
 
+    ## manual set of include dirs, can't be set in the etn_target_test macro
+    get_target_property(INCLUDE_DIRS_TARGET ${PROJECT_NAME} INCLUDE_DIRECTORIES)
+    target_include_directories(${PROJECT_NAME}-test PRIVATE ${INCLUDE_DIRS_TARGET})
+    target_include_directories(${PROJECT_NAME}-coverage PRIVATE ${INCLUDE_DIRS_TARGET})
+
     #build selftest-rw/0 for test outputs (see FTY_SHM_METRIC_TYPE)
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/selftest-rw/0)
-
-    #enable coverage
-    etn_coverage(${PROJECT_NAME}-test)
 
     #build selftest-rw/0 for test outputs (see FTY_SHM_METRIC_TYPE)
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/selftest-rw/0)
