@@ -17,6 +17,8 @@ etn_target(shared ${PROJECT_NAME}
         fty_proto
 )
 
+set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
+
 # -- see fty-shm-cleanup/resources .conf file --
 #create run/42shm/0 (see FTY_SHM_METRIC_TYPE)
 #owner & privileges: /run/42shm/0 0777 bios root
