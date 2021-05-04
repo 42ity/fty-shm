@@ -1,0 +1,12 @@
+[Unit]
+Description=Timer to regularly trigger the job done by @TARGET_NAME@ service
+PartOf=bios-pre-eula.target
+
+[Timer]
+### Run every night
+OnCalendar=*-*-* 04:20:00
+# Do not record last-execution times
+Persistent=false
+
+[Install]
+WantedBy=bios-pre-eula.target

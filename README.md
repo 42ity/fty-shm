@@ -7,6 +7,17 @@ memory (SHM). It provides a basic C api and a more full-featured C++ api. For
 any given metric, there can be any number of writers and readers and the
 library guarantees that the data will be consistent.
 
+## How to build
+
+To build, run:
+
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=usr -DBUILD_TESTING=On ..
+make
+sudo make install
+```
+
 ## Client usage
 ```
 fty-shm-cli [options]
@@ -30,7 +41,7 @@ fty-shm-cli [--details / -d] device [filter] print all information about the dev
 
 ## Environment variable
 
-This library use the environment variable FTY_SHM_AUTOCLEAN to decide if it 
+This library use the environment variable FTY_SHM_AUTOCLEAN to decide if it
 must autodelete the outdated metrics or not. If FTY_SHM_AUTOCLEAN is set to "OFF",
 the outdated metrics will not be automaticly deleted.
 The environment variable FTY_SHM_TEST_POLLING_INTERVAL is set by fty_shm_set_default_polling_interval.
