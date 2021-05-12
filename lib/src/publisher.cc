@@ -81,11 +81,14 @@ static int mqPublish(fty_proto_t* metric)
     bool isConnected = false;
     int ret = -1;
 
+    mqInit();
+
     do {
+        if (!metric)
+            { log_error(ac_RED "metric is NULL" ac_0); break; }
+
         char clientId[32];
         snprintf(clientId, sizeof(clientId), "fty-shm-mqtt-%d", getpid());
-
-        mqInit();
 
         const bool clean_session = true;
         mosq = mosquitto_new(clientId, clean_session, NULL);
@@ -133,6 +136,19 @@ static int mqPublish(fty_proto_t* metric)
     return ret;
 }
 
+static fty_proto_t* protoMetric(const std::string& metric, const std::string& asset, const std::string& value, const std::string& unit, uint32_t ttl)
+{
+    fty_proto_t* proto = fty_proto_new(FTY_PROTO_METRIC);
+    if (proto) {
+        fty_proto_set_type(proto, "%s", metric.empty() ? "" : metric.c_str());
+        fty_proto_set_name(proto, "%s", asset.empty() ? "" : asset.c_str());
+        fty_proto_set_value(proto, "%s", value.empty() ? "" : value.c_str());
+        fty_proto_set_unit(proto, "%s", unit.empty() ? "" : unit.c_str());
+        fty_proto_set_ttl(proto, ttl);
+    }
+    return proto; // NULL or valid object
+}
+
 int publishMetric(fty_proto_t* metric)
 {
     return mqPublish(metric);
@@ -140,16 +156,7 @@ int publishMetric(fty_proto_t* metric)
 
 int publishMetric(const std::string& metric, const std::string& asset, const std::string& value, const std::string& unit, uint32_t ttl)
 {
-    fty_proto_t* proto = fty_proto_new(FTY_PROTO_METRIC);
-    if (!proto)
-        { log_error("proto alloc. failed"); return -1; }
-
-    fty_proto_set_type(proto, "%s", metric.empty() ? "" : metric.c_str());
-    fty_proto_set_name(proto, "%s", asset.empty() ? "" : asset.c_str());
-    fty_proto_set_value(proto, "%s", value.empty() ? "" : value.c_str());
-    fty_proto_set_unit(proto, "%s", unit.empty() ? "" : unit.c_str());
-    fty_proto_set_ttl(proto, ttl);
-
+    fty_proto_t* proto = protoMetric(metric, asset, value, unit, ttl);
     int r = publishMetric(proto);
     fty_proto_destroy(&proto);
     return r;
@@ -157,7 +164,8 @@ int publishMetric(const std::string& metric, const std::string& asset, const std
 
 int publishMetric(const std::string& fileName, const std::string& value, const std::string& unit, uint32_t ttl)
 {
-    std::string metric(fileName); //path
+    // extract metric/asset from fileName (path/to/file/metric@asset)
+    std::string metric(fileName);
     std::string asset;
 
     auto pos = metric.rfind("/");
