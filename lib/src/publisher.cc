@@ -22,10 +22,13 @@
 #include <fty_common.h>
 #include <fty_proto.h>
 #include <fty_log.h>
+#include <log4cplus/loglevel.h>
 #include <cxxtools/jsonserializer.h>
 #include <mosquitto.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include <string>
 
 // ANSI console coloring
@@ -34,48 +37,83 @@
 #define ac_RED     "\x1b[1;31m"
 #define ac_0       "\x1b[0m" // reset
 
-static Ftylog* mqLogger = NULL;
+// logger
+static struct Logger {
+    Ftylog* m_logger{NULL};
+    const std::string m_name{"fty-shm-mqtt"};
+    const std::string m_cfgFile{FTY_COMMON_LOGGING_DEFAULT_CFG};
+    const bool m_verbose{true};
 
-#define mqLogDebug(...) { if (mqLogger) log_debug_log(mqLogger, __VA_ARGS__); }
-#define mqLogInfo(...) { if (mqLogger) log_info_log(mqLogger, __VA_ARGS__); }
-#define mqLogError(...) { if (mqLogger) log_error_log(mqLogger, __VA_ARGS__); }
+    ~Logger()
+    {
+        if (!m_logger) return;
+        log(log4cplus::TRACE_LOG_LEVEL, "logger released");
+        ftylog_delete(m_logger);
+        m_logger = NULL;
+    }
 
-static void mqLoggerInit(bool verbose)
-{
-    if (mqLogger) return; // once
+    void init()
+    {
+        if (m_logger) return; // once
+        m_logger = ftylog_new(m_name.c_str(), m_cfgFile.c_str());
+        if (!m_logger) return;
 
-    mqLogger = ftylog_new("fty-shm-mqtt", FTY_COMMON_LOGGING_DEFAULT_CFG);
-    if (!mqLogger) return;
+        if (m_verbose) ftylog_setLogLevelTrace(m_logger);
+        else ftylog_setLogLevelInfo(m_logger);
+        log(log4cplus::TRACE_LOG_LEVEL, "logger initialized from '%s'", m_cfgFile.c_str());
+    }
 
-    if (verbose) ftylog_setLogLevelTrace(mqLogger);
-    else ftylog_setLogLevelInfo(mqLogger);
-    mqLogDebug("mqLogger initialized");
-}
+    void log(log4cplus::LogLevel level, const char* fmt, ...)
+    {
+        if (!m_logger) return;
 
-static void mqClientInit()
-{
-    static bool libInitialized = false;
-    if (libInitialized) return; // once
+        std::string msg;
+        if (fmt) {
+            char* aux = NULL;
+            va_list args;
+            va_start(args, fmt);
+            vasprintf(&aux, fmt, args);
+            va_end(args);
+            if (aux)
+                { msg = std::string{aux}; free(aux); }
+        }
 
-    libInitialized = true;
-    mosquitto_lib_init();
-    mqLogDebug("mosq library initialized");
-}
+        // ANSI console coloring
+        switch (level) {
+            case log4cplus::INFO_LOG_LEVEL: msg = ac_WHITE + msg + ac_0; break;
+            case log4cplus::WARN_LOG_LEVEL: msg = ac_YELLOW + msg + ac_0; break;
+            case log4cplus::ERROR_LOG_LEVEL:
+            case log4cplus::FATAL_LOG_LEVEL: msg = ac_RED + msg + ac_0; break;
+            default:;
+        }
+        // log
+        log_macro(level, m_logger, msg.c_str());
+    }
+} mqLogger;
+
+// logging
+#define mqLogTrace(...) mqLogger.log(log4cplus::TRACE_LOG_LEVEL, __VA_ARGS__);
+#define mqLogDebug(...) mqLogger.log(log4cplus::DEBUG_LOG_LEVEL, __VA_ARGS__);
+#define mqLogInfo(...) mqLogger.log(log4cplus::INFO_LOG_LEVEL, __VA_ARGS__);
+#define mqLogWarn(...) mqLogger.log(log4cplus::WARN_LOG_LEVEL, __VA_ARGS__);
+#define mqLogError(...) mqLogger.log(log4cplus::ERROR_LOG_LEVEL, __VA_ARGS__);
+#define mqLogFatal(...) mqLogger.log(log4cplus::FATAL_LOG_LEVEL, __VA_ARGS__);
 
 // proto metric json serializer
 static int metric2JSON(fty_proto_t* metric, std::string& json)
 {
     json.clear();
+
     if (!metric)
         { mqLogError("metric is NULL"); return -1; }
     if (fty_proto_id(metric) != FTY_PROTO_METRIC)
         { mqLogError("metric is not FTY_PROTO_METRIC"); return -2; }
 
-    const char* type_ = fty_proto_type(metric); // metric name
-    const char* name_ = fty_proto_name(metric); // asset
+    const char* type_ = fty_proto_type(metric); // metric
+    const char* name_ = fty_proto_name(metric); // asset name
     const char* value_ = fty_proto_value(metric);
     const char* unit_ = fty_proto_unit(metric);
-    const uint32_t ttl = fty_proto_ttl(metric);
+    const uint32_t ttl_ = fty_proto_ttl(metric);
 
     try {
         std::string metricName = std::string(type_ ? type_ : "") + "@" + std::string(name_ ? name_ : "");
@@ -87,13 +125,13 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
         si.addMember("metric") <<= metricName;
         si.addMember("value") <<= value;
         si.addMember("unit") <<= unit;
-        si.addMember("ttl") <<= ttl;
+        si.addMember("ttl") <<= ttl_;
         si.addMember("timestamp") <<= std::to_string(std::time(nullptr)); // epoch time (now)
 
         json = JSON::writeToString(si, false/*beautify*/);
     }
     catch (const std::exception& e) {
-        mqLogError("serialization failed (e: %s)", e.what());
+        mqLogError("json serialization failed (e: %s)", e.what());
         return -3;
     }
 
@@ -114,10 +152,24 @@ static fty_proto_t* protoMetric(const std::string& metric, const std::string& as
     return proto; // NULL or valid object
 }
 
+// mq client initializer
+static void mqClientInit()
+{
+    static bool libInitialized = false;
+    if (libInitialized) return; // once
+
+    libInitialized = true;
+    mosquitto_lib_init();
+    mqLogDebug("mosq library initialized");
+}
+
 // proto metric publisher
 static int mqPublish(fty_proto_t* metric)
 {
-    mqLoggerInit(false/*verbose*/);
+    const char* MQTT_HOST = "localhost";
+    const int MQTT_PORT = 1883;
+
+    mqLogger.init();
     mqClientInit();
 
     struct mosquitto* mosq = NULL;
@@ -126,15 +178,15 @@ static int mqPublish(fty_proto_t* metric)
 
     do {
         if (!metric)
-            { mqLogError(ac_RED "metric is NULL" ac_0); break; }
+            { mqLogError("metric is NULL"); break; }
 
-        // json payload
+        // metric json payload
         std::string json;
         int r = metric2JSON(metric, json);
         if (r != 0)
-            { mqLogError(ac_RED "metric2JSON failed (r: %d,)" ac_0, r); break; }
+            { mqLogError("metric2JSON failed (r: %d)", r); break; }
         if (json.empty())
-            { mqLogError(ac_RED "metric2JSON json is empty" ac_0); break; }
+            { mqLogError("metric2JSON json is empty"); break; }
 
         // new mosq instance
         char clientId[32];
@@ -142,18 +194,18 @@ static int mqPublish(fty_proto_t* metric)
         const bool clean_session = true;
         mosq = mosquitto_new(clientId, clean_session, NULL);
         if (!mosq)
-            { mqLogError(ac_RED "mosq creation failed" ac_0); break; }
-        mqLogDebug("mosq creation success (clientId: %s)", clientId);
+            { mqLogError("mosq creation failed"); break; }
+        mqLogDebug("mosq creation success (clientId: '%s')", clientId);
 
-        // connect to host/broker
-        const char* host = "localhost";
-        const int port = 1883;
-        const int keepalive = 15;
+        // connect to host
+        const char* host = MQTT_HOST;
+        const int port = MQTT_PORT;
+        const int keepalive = 15; //sec.
         r = mosquitto_connect(mosq, host, port, keepalive);
         isConnected = (r == MOSQ_ERR_SUCCESS);
         if (!isConnected)
-            { mqLogError(ac_RED "mosq connect failed (r: %d [%s], %s:%d)" ac_0, r, strerror(errno), host, port); break; }
-        mqLogDebug("mosq connect success (%s:%d)", host, port);
+            { mqLogError("mosq connect failed (r: %d [%s], host: '%s:%d')", r, strerror(errno), host, port); break; }
+        mqLogDebug("mosq connect success (host: '%s:%d')", host, port);
 
         // publish
         char topic[128];
@@ -163,10 +215,10 @@ static int mqPublish(fty_proto_t* metric)
         const bool retain = false;
         r = mosquitto_publish(mosq, &msgId, topic, static_cast<int>(json.size()), json.c_str(), qos, retain);
         if (r != MOSQ_ERR_SUCCESS)
-            { mqLogError(ac_RED "mosq publish failed (r: %d [%s], topic: %s)" ac_0, r, strerror(errno), topic); break; }
+            { mqLogError("mosq publish failed (r: %d [%s], topic: '%s')", r, strerror(errno), topic); break; }
 
         // success
-        mqLogInfo(ac_WHITE "mosq publish success (topic: %s)" ac_0, topic);
+        mqLogInfo("mosq publish success (msgId: %d, topic: '%s')", msgId, topic);
         ret = 0;
         break;
     } while(0);
@@ -174,6 +226,7 @@ static int mqPublish(fty_proto_t* metric)
     if (mosq) {
         if (isConnected) mosquitto_disconnect(mosq);
         mosquitto_destroy(mosq);
+        mosq = NULL;
     }
 
     return ret;
@@ -199,7 +252,7 @@ int publishMetric(const std::string& metric, const std::string& asset, const std
 int publishMetric(const std::string& fileName, const std::string& value, const std::string& unit, uint32_t ttl)
 {
     // extract metric/asset from fileName (path/to/file/metric@asset)
-    std::string metric(fileName);
+    std::string metric{fileName};
     std::string asset;
 
     auto pos = metric.rfind("/");
