@@ -171,7 +171,7 @@ static int mqPublish(fty_proto_t* metric)
     const int MQTT_PORT = 1883;
     const int MQTT_KEEPALIVE = 15; //sec
     // publish
-    const int MQTT_QOS = 2;
+    const int MQTT_QOS = 0;
     const bool MQTT_RETAIN = false;
 
     logger.init();
