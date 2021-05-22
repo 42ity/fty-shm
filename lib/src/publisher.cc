@@ -43,7 +43,8 @@ static struct Logger {
     Ftylog* m_logger{NULL};
     const std::string m_name{"fty-shm-mqtt"};
     const std::string m_cfgFile{FTY_COMMON_LOGGING_DEFAULT_CFG};
-    const bool m_verbose{true};
+    const bool m_silent{false}; // silent mode (no log)
+    const bool m_verbose{true}; // verbosity level (trace vs. info)
 
     Logger()
     {
@@ -64,15 +65,19 @@ static struct Logger {
         m_logger = ftylog_new(m_name.c_str(), m_cfgFile.c_str());
         if (!m_logger) return;
 
-        if (m_verbose) { /*ftylog_setLogLevelTrace(m_logger);*/ ftylog_setVerboseMode(m_logger); }
-        else ftylog_setLogLevelInfo(m_logger);
+        if (m_verbose)
+            { ftylog_setLogLevelTrace(m_logger); /*ftylog_setVerboseMode(m_logger);*/ }
+        else
+            { ftylog_setLogLevelInfo(m_logger); }
         log(log4cplus::TRACE_LOG_LEVEL, "logger initialized from '%s'", m_cfgFile.c_str());
     }
 
     void log(log4cplus::LogLevel level, const char* fmt, ...)
     {
+        if (m_silent) return; // silent mode (no log)
         if (!m_logger) return;
 
+        // handle variadics
         std::string msg;
         if (fmt) {
             char* aux = NULL;
@@ -84,7 +89,7 @@ static struct Logger {
                 { msg = std::string{aux}; free(aux); }
         }
 
-        // ANSI console coloring
+        // ANSI console coloring encaps.
         switch (level) {
             case log4cplus::INFO_LOG_LEVEL: msg = ac_WHITE + msg + ac_0; break;
             case log4cplus::WARN_LOG_LEVEL: msg = ac_YELLOW + msg + ac_0; break;
@@ -92,12 +97,13 @@ static struct Logger {
             case log4cplus::FATAL_LOG_LEVEL: msg = ac_RED + msg + ac_0; break;
             default:;
         }
+
         // log
         log_macro(level, m_logger, msg.c_str());
     }
 } logger;
 
-// logging
+// logger'ing
 #define LogInit() logger.init()
 #define LogTrace(...) logger.log(log4cplus::TRACE_LOG_LEVEL, __VA_ARGS__)
 #define LogDebug(...) logger.log(log4cplus::DEBUG_LOG_LEVEL, __VA_ARGS__)
@@ -108,15 +114,15 @@ static struct Logger {
 
 static bool mosquitto_libInitialized{false};
 
-// mosquitto client
+// mqClient, simple mqtt client (mosquitto)
 static struct MosquittoClient {
     // connect args
     const char* MQTT_HOST{"localhost"};
     const int MQTT_PORT{1883};
-    const int MQTT_KEEPALIVE{15}; //sec
+    const int MQTT_KEEPALIVE{5}; // sec
     // publish args
-    const int MQTT_QOS{1};
-    const bool MQTT_RETAIN{false};
+    const int MQTT_QOS{0};
+    const bool MQTT_RETAIN{true};
 
     MosquittoClient()
     {
@@ -126,6 +132,8 @@ static struct MosquittoClient {
             mosquitto_libInitialized = true;
             mosquitto_lib_init();
             LogTrace("mosq library initialized");
+            LogTrace("mosq host(%s:%d), alive(%d), qos(%d), retain(%s)",
+                MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE, MQTT_QOS, (MQTT_RETAIN ? "true" : "false"));
         }
     }
 
@@ -134,74 +142,81 @@ static struct MosquittoClient {
         destroy();
     }
 
-    // publish data on topic
-    int publish (const std::string& topic, const std::string& data)
+    // client publish (data on topic)
+    // returns 0 if success, else <0
+    int publish(const std::string& topic, const std::string& data)
     {
         if (connect() != 0)
             { return -1; }
 
-        int msgId = 0;
-        int r = mosquitto_publish(m_mosq, &msgId, topic.c_str(), static_cast<int>(data.size()), data.c_str(), MQTT_QOS, MQTT_RETAIN);
+        std::time_t now = std::time(NULL); // sec
+
+        int msgId{0};
+        int r = mosquitto_publish(m_instance, &msgId, topic.c_str(), static_cast<int>(data.size()), data.c_str(), MQTT_QOS, MQTT_RETAIN);
         if (r != MOSQ_ERR_SUCCESS) {
             LogError("mosq publish failed (r: %d [%s], topic: '%s')", r, strerror(errno), topic.c_str());
             return -2;
         }
 
         LogInfo("mosq publish success (topic: '%s')", topic.c_str());
+        m_lastActivityTime = now;
         return 0;
     }
 
 private:
     // members
-    struct mosquitto* m_mosq{NULL};
+    struct mosquitto* m_instance{NULL}; // client instance
     bool m_isConnected{false};
-    std::time_t m_lastConnectionTime{0}; // sec
+    std::time_t m_lastActivityTime{0}; // epoch time (sec)
 
     // client connect
+    // returns 0 if success, else <0
     int connect()
     {
-        // force reconnect (WA broker timeout disconnection)
-        std::time_t now = std::time(NULL); //sec
-        if (m_mosq && m_isConnected && ((m_lastConnectionTime + 10) < now)) {
-            // publish don't work if we use mosquitto_reconnect()
+        std::time_t now = std::time(NULL); // sec
+
+        // force reconnection to prevent server timeout disconnection
+        if (m_instance && m_isConnected && ((m_lastActivityTime + MQTT_KEEPALIVE) <= now)) {
+            // note: publish() do nothing if we use mosquitto_reconnect() here
             LogTrace("mosq force reconnect");
-            destroy(); // to create a new instance
+            destroy(); // brute to trigger create & connect
         }
 
-        // create mosq instance if none
-        if (!m_mosq) {
-            char clientId[32];
-            snprintf(clientId, sizeof(clientId), "fty-shm-mqtt-%d", getpid());
-            m_mosq = mosquitto_new(clientId, true/*clean_session*/, NULL);
+        // create instance if required
+        if (!m_instance) {
+            const std::string clientId{"fty-shm-mqtt-" + std::to_string(getpid())};
+            const bool cleanSession{true};
+            m_instance = mosquitto_new(clientId.c_str(), cleanSession, NULL);
             m_isConnected = false;
-            if (!m_mosq)
+            if (!m_instance)
                 { LogError("mosq creation failed"); }
             else
-                { LogDebug("mosq creation success (clientId: '%s')", clientId); }
+                { LogTrace("mosq creation success (clientId: '%s')", clientId.c_str()); }
         }
 
-        // connect to host if none
-        if (m_mosq && !m_isConnected) {
-            int r = mosquitto_connect(m_mosq, MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE);
+        // connect to host if required
+        if (m_instance && !m_isConnected) {
+            int r = mosquitto_connect(m_instance, MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE);
             m_isConnected = (r == MOSQ_ERR_SUCCESS);
-            m_lastConnectionTime = m_isConnected ? now : 0;
+            m_lastActivityTime = m_isConnected ? now : 0;
             if (!m_isConnected)
                 { LogError("mosq connect failed (r: %d [%s], host: '%s:%d')", r, strerror(errno), MQTT_HOST, MQTT_PORT); }
             else
-                { LogDebug("mosq connect success (host: '%s:%d')", MQTT_HOST, MQTT_PORT); }
+                { LogTrace("mosq connect success (host: '%s:%d')", MQTT_HOST, MQTT_PORT); }
         }
 
-        return (m_mosq && m_isConnected) ? 0 : -1;
+        return (m_instance && m_isConnected) ? 0 : -1;
     }
 
     // client disconnect
     void disconnect()
     {
-        if (m_mosq && m_isConnected) {
-            mosquitto_disconnect(m_mosq);
+        if (m_instance && m_isConnected) {
+            mosquitto_disconnect(m_instance);
             LogTrace("mosq disconnected");
         }
         m_isConnected = false;
+        m_lastActivityTime = 0;
     }
 
     // client destroy
@@ -209,11 +224,11 @@ private:
     {
         disconnect();
 
-        if (m_mosq) {
-            mosquitto_destroy(m_mosq);
-            LogTrace("mosq destroyed");
+        if (m_instance) {
+            mosquitto_destroy(m_instance);
+            LogTrace("mosq released");
         }
-        m_mosq = NULL;
+        m_instance = NULL;
     }
 } mqClient;
 
@@ -235,7 +250,7 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
     const uint32_t ttl_ = fty_proto_ttl(metric);
 
     try {
-        std::string metricName = std::string(type_ ? type_ : "") + "@" + std::string(name_ ? name_ : "");
+        std::string metricName{std::string(type_ ? type_ : "null") + "@" + std::string(name_ ? name_ : "null?")};
         std::string value{value_ ? value_ : ""};
         std::string unit{unit_ ? unit_ : ""};
         if (unit == " ") unit = ""; // emptied if single space
@@ -257,15 +272,12 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
     return 0;
 }
 
-// proto metric publisher
+// proto metric mqtt publisher
 // returns 0 if success, else <0
-static int mqPublish(fty_proto_t* metric)
+static int mqttPublish(fty_proto_t* metric)
 {
     int ret = -1;
     do {
-        if (!metric)
-            { LogError("metric is NULL"); break; }
-
         // build metric json payload
         std::string json;
         int r = metric2JSON(metric, json);
@@ -274,7 +286,7 @@ static int mqPublish(fty_proto_t* metric)
         if (json.empty())
             { LogError("metric2JSON json is empty"); break; }
 
-        // publish
+        // publish on metric topic
         std::string asset_{fty_proto_name(metric)};
         std::string metric_{fty_proto_type(metric)};
         std::string topic{"/metric/fty-shm/" + asset_ + "/" + metric_};
@@ -312,7 +324,7 @@ static fty_proto_t* protoMetric(const std::string& metric, const std::string& as
 
 int publishMetric(fty_proto_t* metric)
 {
-    return mqPublish(metric);
+    return mqttPublish(metric);
 }
 
 int publishMetric(const std::string& metric, const std::string& asset, const std::string& value, const std::string& unit, uint32_t ttl)
