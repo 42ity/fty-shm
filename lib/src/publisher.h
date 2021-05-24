@@ -23,6 +23,9 @@
 #include <fty_proto.h>
 #include <string>
 
+// publishMetric()
+// returns 0 if success, else <0
+
 int publishMetric(fty_proto_t* metric);
 int publishMetric(const std::string& metric, const std::string& asset, const std::string& value, const std::string& unit, uint32_t ttl);
 int publishMetric(const std::string& fileName, const std::string& value, const std::string& unit, uint32_t ttl);
