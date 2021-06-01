@@ -24,13 +24,27 @@
 #include <fty_log.h>
 #include <log4cplus/loglevel.h>
 #include <cxxtools/jsonserializer.h>
+
+//#define _USE_MOSQUITTO_
+#define _USE_FTY_COMMON_MESSAGEBUS_
+
+#ifdef _USE_MOSQUITTO_
 #include <mosquitto.h>
+#endif
+
+#ifdef _USE_FTY_COMMON_MESSAGEBUS_
+#include "fty_common_messagebus_dto.h"
+#include "fty_common_messagebus_exception.h"
+#include "fty_common_messagebus_interface.h"
+#include "fty_common_messagebus_message.h"
+#endif //_USE_FTY_COMMON_MESSAGEBUS_
 
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string>
+#include <list>
 #include <ctime>
 #include <mutex>
 
@@ -114,7 +128,7 @@ public:
 
 private:
     // conf
-    const std::string m_name{"fty-shm-mqtt"};
+    const std::string m_name{"fty-shm-logger"};
     const std::string m_cfgFile{FTY_COMMON_LOGGING_DEFAULT_CFG};
     const bool m_silent{false}; // silent mode (no log)
     const bool m_verbose{true}; // verbosity level (trace vs. info)
@@ -133,15 +147,17 @@ private:
 #define LogFatal(...) logger.log(log4cplus::FATAL_LOG_LEVEL, __VA_ARGS__)
 
 //
-// mqClient, simple mqtt client (mosquitto)
+// mqClient, simple mqtt client (mosquitto vs fty-common-messagebus)
 //
+
+#ifdef _USE_MOSQUITTO_
 
 static std::mutex mosquitto_libInitMutex;
 static int mosquitto_libInitCounter{0};
 
-static struct MosquittoClient {
+static struct mosquittoClient {
 public:
-    MosquittoClient()
+    mosquittoClient()
     {
         LogInit();
 
@@ -160,7 +176,7 @@ public:
         }
     }
 
-    ~MosquittoClient()
+    ~mosquittoClient()
     {
         destroy();
 
@@ -220,7 +236,7 @@ private:
 
         // create instance if none
         if (!m_instance) {
-            const std::string clientId{"fty-shm-mqtt-" + std::to_string(getpid())};
+            const std::string clientId{"fty-shm-mqtt-mosq" + std::to_string(getpid())};
             const bool cleanSession{true};
             m_isConnected = false;
             m_instance = mosquitto_new(clientId.c_str(), cleanSession, nullptr);
@@ -269,6 +285,110 @@ private:
         m_instance = nullptr;
     }
 } mqClient;
+
+#endif //_USE_MOSQUITTO_
+
+#ifdef _USE_FTY_COMMON_MESSAGEBUS_
+
+static struct ftyCommonMessagebusClient {
+public:
+    ftyCommonMessagebusClient()
+    {
+        LogInit();
+    }
+
+    ~ftyCommonMessagebusClient()
+    {
+        destroy();
+    }
+
+    // client publish (data on topic)
+    // returns 0 if success, else <0
+    int publish(const std::string& topic, const std::string& data)
+    {
+        int r = connect();
+        if (r != 0) return -1;
+
+        try {
+            messagebus::Message message;
+            message.userData().push_back(data);
+            message.metaData().clear();
+            message.metaData().emplace(messagebus::Message::FROM, "fty-shm-mqtt-msg");
+            message.metaData().emplace(messagebus::Message::SUBJECT, "pub-metric");
+            m_instance->publish(topic, message);
+        }
+        catch (const std::exception& e) {
+            LogError("mqttMsg publish failed (topic: '%s', e: '%s')", topic.c_str(), e.what());
+            return -2;
+        }
+
+        LogInfo("mqttMsg publish (topic: '%s')", topic.c_str());
+        return 0;
+    }
+
+private:
+    // connect conf.
+    const std::string MQTT_HOST{"tcp://localhost:1883"};
+
+    // members
+    messagebus::IMessageBus* m_instance{nullptr}; // client instance
+    bool m_isConnected{false}; // instance con. state
+
+    // client connect
+    // returns 0 if success, else <0
+    int connect()
+    {
+        // create instance if none
+        if (!m_instance) {
+            const std::string clientId{"fty-shm-mqtt-msg-" + std::to_string(getpid())};
+            m_isConnected = false;
+            m_instance = messagebus::MqttMsgBus(MQTT_HOST, clientId);
+            if (!m_instance) {
+                LogError("mqttMsg creation failed (%s)", MQTT_HOST.c_str());
+                return -1;
+            }
+            LogTrace("mqttMsg creation (host: '%s', clientId: '%s')", MQTT_HOST.c_str(), clientId.c_str());
+        }
+
+        // connect to host if not
+        if (!m_isConnected) {
+            try {
+                m_instance->connect();
+                m_isConnected = true;
+            }
+            catch (const std::exception& e) {
+                LogError("mqttMsg connect failed (host: '%s', e: '%s')", MQTT_HOST.c_str(), e.what());
+                return -2;
+            }
+            LogTrace("mqttMsg connect (host: '%s')", MQTT_HOST.c_str());
+        }
+
+        return 0;
+    }
+
+    // client disconnect
+    void disconnect()
+    {
+        if (m_instance && m_isConnected) {
+            LogTrace("mqttMsg disconnected (nop)");
+        }
+        m_isConnected = false;
+    }
+
+    // client destroy
+    void destroy()
+    {
+        disconnect();
+
+        if (m_instance) {
+            delete m_instance;
+            LogTrace("mqttMsg released");
+        }
+        m_instance = nullptr;
+    }
+} mqClient;
+
+#endif //_USE_FTY_COMMON_MESSAGEBUS_
 
 // proto metric json serializer
 // returns 0 if success, else <0
@@ -325,7 +445,12 @@ static int mqttPublish(fty_proto_t* metric)
     // publish on metric topic
     std::string asset_{fty_proto_name(metric)};
     std::string metric_{fty_proto_type(metric)};
-    std::string topic{"/metric/fty-shm/" + asset_ + "/" + metric_};
+#ifdef _USE_MOSQUITTO_
+    std::string topic{"/metric/fty-shm-mosq/" + asset_ + "/" + metric_};
+#endif
+#ifdef _USE_FTY_COMMON_MESSAGEBUS_
+    std::string topic{"/metric/fty-shm-msg/" + asset_ + "/" + metric_};
+#endif
     r = mqClient.publish(topic, json);
     if (r != 0) return -2;
 

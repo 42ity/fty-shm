@@ -15,8 +15,12 @@ etn_target(shared ${PROJECT_NAME}
     USES
         czmq
         fty_proto
-        mosquitto cxxtools fty_common fty_common_logging #mqtt publisher
+        mosquitto #pub mqtt mosquitto lib client
+#        fty_common_messagebus #pub mqtt fty-common-messagebus client
+        cxxtools fty_common fty_common_logging #mqtt publisher
 )
+
+target_link_libraries(${PROJECT_NAME} PRIVATE fty_common_messagebus)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 
@@ -36,11 +40,15 @@ if (BUILD_TESTING)
         USES
             czmq
             fty_proto
-            mosquitto cxxtools fty_common fty_common_logging #mqtt publisher
+            mosquitto #pub mqtt mosquitto lib client
+#            fty_common_messagebus #pub mqtt fty-common-messagebus client
+            cxxtools fty_common fty_common_logging #mqtt publisher
             Catch2::Catch2
             stdc++fs
             log4cplus
     )
+
+    target_link_libraries(${PROJECT_NAME}-test PRIVATE fty_common_messagebus)
 
     ## manual set of include dirs, can't be set in the etn_target_test macro
     get_target_property(INCLUDE_DIRS_TARGET ${PROJECT_NAME} INCLUDE_DIRECTORIES)
