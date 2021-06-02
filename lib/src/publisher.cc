@@ -291,6 +291,11 @@ private:
 
 #ifdef _USE_FTY_COMMON_MESSAGEBUS_
 
+namespace messagebus {
+    class IMessageBus;
+    class Message;
+}
+
 static struct ftyCommonMessagebusClient {
 public:
     ftyCommonMessagebusClient()
