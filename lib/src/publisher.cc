@@ -34,10 +34,7 @@
 #else
 #ifdef _USE_FTY_COMMON_MESSAGEBUS_
     #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS_ ===="
-    #include "fty_common_messagebus_dto.h"
-    #include "fty_common_messagebus_exception.h"
-    #include "fty_common_messagebus_interface.h"
-    #include "fty_common_messagebus_message.h"
+    #include <fty_common_messagebus.h>
 #else
     #error "compile option required"
 #endif
@@ -298,6 +295,8 @@ static struct ftyCommonMessagebusClient {
 public:
     ftyCommonMessagebusClient()
     {
+        m_instance = nullptr;
+        m_isConnected = false;
         LogInit();
     }
 
@@ -335,8 +334,8 @@ private:
     const std::string MQTT_HOST{"tcp://localhost:1883"};
 
     // members
-    messagebus::IMessageBus* m_instance{nullptr}; // client instance
-    bool m_isConnected{false}; // instance con. state
+    messagebus::IMessageBus* m_instance; // client instance
+    bool m_isConnected; // instance con. state
 
     // client connect
     // returns 0 if success, else <0
