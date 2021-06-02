@@ -34,7 +34,12 @@
 #else
 #ifdef _USE_FTY_COMMON_MESSAGEBUS_
     #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS_ ===="
-    #include <fty_common_messagebus.h>
+    #include <fty_common_messagebus_interface.h>
+    #include <fty_common_messagebus_message.h>
+    #include <fty_common_messagebus_dto.h>
+    #include <fty_common_messagebus_dispatcher.h>
+    #include <fty_common_messagebus_pool_worker.h>
+    #include <fty_common_messagebus_exception.h>
 #else
     #error "compile option required"
 #endif
