@@ -29,15 +29,19 @@
 #define _USE_FTY_COMMON_MESSAGEBUS_
 
 #ifdef _USE_MOSQUITTO_
-#include <mosquitto.h>
-#endif
-
+    #pragma message "==== PUBLISHER _USE_MOSQUITTO_ ===="
+    #include <mosquitto.h>
+#else
 #ifdef _USE_FTY_COMMON_MESSAGEBUS_
-#include "fty_common_messagebus_dto.h"
-#include "fty_common_messagebus_exception.h"
-#include "fty_common_messagebus_interface.h"
-#include "fty_common_messagebus_message.h"
-#endif //_USE_FTY_COMMON_MESSAGEBUS_
+    #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS_ ===="
+    #include "fty_common_messagebus_dto.h"
+    #include "fty_common_messagebus_exception.h"
+    #include "fty_common_messagebus_interface.h"
+    #include "fty_common_messagebus_message.h"
+#else
+    #error "compile option required"
+#endif
+#endif //
 
 #include <sys/types.h>
 #include <unistd.h>
