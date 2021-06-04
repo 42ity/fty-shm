@@ -28,30 +28,22 @@
 //#define _USE_MOSQUITTO_
 #define _USE_FTY_COMMON_MESSAGEBUS_
 
-#ifdef _USE_MOSQUITTO_
+#if defined _USE_MOSQUITTO_
     #pragma message "==== PUBLISHER _USE_MOSQUITTO_ ===="
     #include <mosquitto.h>
-#else
-#ifdef _USE_FTY_COMMON_MESSAGEBUS_
+    #include <ctime>
+#elif defined _USE_FTY_COMMON_MESSAGEBUS_
     #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS_ ===="
-    #include <fty_common_messagebus_interface.h>
-    #include <fty_common_messagebus_message.h>
-    #include <fty_common_messagebus_dto.h>
-    #include <fty_common_messagebus_dispatcher.h>
-    #include <fty_common_messagebus_pool_worker.h>
-    #include <fty_common_messagebus_exception.h>
+    #include <fty_common_messagebus.h>
 #else
     #error "compile option required"
 #endif
-#endif //
 
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string>
-#include <list>
-#include <ctime>
 #include <mutex>
 
 // ANSI console coloring
@@ -89,17 +81,17 @@ public:
         const std::lock_guard<std::mutex> lock(loggerMutex);
 
         if (m_logger) return; // once
-        m_logger = ftylog_new(m_name.c_str(), m_cfgFile.c_str());
+        m_logger = ftylog_new(LOGGER_NAME.c_str(), LOGGER_CONF_FILE.c_str());
         if (!m_logger) return;
 
         if (!m_silent) {
             if (m_verbose)
-                { /*ftylog_setLogLevelTrace(m_logger);*/ ftylog_setVerboseMode(m_logger); }
+                { ftylog_setLogLevelTrace(m_logger); /*ftylog_setVerboseMode(m_logger);*/ }
             else
                 { ftylog_setLogLevelInfo(m_logger); }
         }
 
-        log(log4cplus::TRACE_LOG_LEVEL, "logger initialized from '%s'", m_cfgFile.c_str());
+        log(log4cplus::TRACE_LOG_LEVEL, "logger '%s' initialized from '%s'", LOGGER_NAME.c_str(), LOGGER_CONF_FILE.c_str());
     }
 
     void log(log4cplus::LogLevel level, const char* fmt, ...)
@@ -134,8 +126,8 @@ public:
 
 private:
     // conf
-    const std::string m_name{"fty-shm-logger"};
-    const std::string m_cfgFile{FTY_COMMON_LOGGING_DEFAULT_CFG};
+    const std::string LOGGER_NAME{"fty-shm"};
+    const std::string LOGGER_CONF_FILE{FTY_COMMON_LOGGING_DEFAULT_CFG};
     const bool m_silent{false}; // silent mode (no log)
     const bool m_verbose{true}; // verbosity level (trace vs. info)
 
@@ -156,7 +148,7 @@ private:
 // mqClient, simple mqtt client (mosquitto vs fty-common-messagebus)
 //
 
-#ifdef _USE_MOSQUITTO_
+#if defined _USE_MOSQUITTO_
 
 static std::mutex mosquitto_libInitMutex;
 static int mosquitto_libInitCounter{0};
@@ -177,7 +169,7 @@ public:
             else
                 { LogTrace("mosq library initialized (%d.%d.%d)", x, y, z); }
 
-            LogTrace("mosq host(%s:%d), alive(%d), qos(%d), retain(%s)",
+            LogInfo("mosq host(%s:%d), alive(%d), qos(%d), retain(%s)",
                 MQTT_HOST, MQTT_PORT, MQTT_KEEPALIVE, MQTT_QOS, (MQTT_RETAIN ? "true" : "false"));
         }
     }
@@ -292,22 +284,15 @@ private:
     }
 } mqClient;
 
-#endif //_USE_MOSQUITTO_
-
-#ifdef _USE_FTY_COMMON_MESSAGEBUS_
-
-namespace messagebus {
-    class IMessageBus;
-    class Message;
-}
+#elif defined _USE_FTY_COMMON_MESSAGEBUS_ // _USE_MOSQUITTO_
 
 static struct ftyCommonMessagebusClient {
 public:
     ftyCommonMessagebusClient()
     {
-        m_instance = nullptr;
-        m_isConnected = false;
         LogInit();
+
+        LogInfo("mqttMsg host (%s)", MQTT_HOST.c_str());
     }
 
     ~ftyCommonMessagebusClient()
@@ -323,12 +308,12 @@ public:
         if (r != 0) return -1;
 
         try {
-            messagebus::Message message;
-            message.userData().push_back(data);
-            message.metaData().clear();
-            message.metaData().emplace(messagebus::Message::FROM, "fty-shm-mqtt-msg");
-            message.metaData().emplace(messagebus::Message::SUBJECT, "pub-metric");
-            m_instance->publish(topic, message);
+            messagebus::Message msg;
+            msg.userData().push_back(data);
+            msg.metaData().clear();
+            msg.metaData().emplace(messagebus::Message::FROM, "fty-shm-mqtt-msg");
+            msg.metaData().emplace(messagebus::Message::SUBJECT, "pub-metric");
+            m_instance->publish(topic, msg);
         }
         catch (const std::exception& e) {
             LogError("mqttMsg publish failed (topic: '%s', e: '%s')", topic.c_str(), e.what());
@@ -344,8 +329,8 @@ private:
     const std::string MQTT_HOST{"tcp://localhost:1883"};
 
     // members
-    messagebus::IMessageBus* m_instance; // client instance
-    bool m_isConnected; // instance con. state
+    messagebus::IMessageBus* m_instance{nullptr}; // client instance
+    bool m_isConnected{false}; // instance con. state
 
     // client connect
     // returns 0 if success, else <0
@@ -354,10 +339,14 @@ private:
         // create instance if none
         if (!m_instance) {
             const std::string clientId{"fty-shm-mqtt-msg-" + std::to_string(getpid())};
-            m_isConnected = false;
-            m_instance = messagebus::MqttMsgBus(MQTT_HOST, clientId);
-            if (!m_instance) {
-                LogError("mqttMsg creation failed (%s)", MQTT_HOST.c_str());
+            try {
+                m_isConnected = false;
+                m_instance = messagebus::MqttMsgBus(MQTT_HOST, clientId);
+                if (!m_instance)
+                    { throw std::runtime_error("MqttMsgBus() returns NULL"); }
+            }
+            catch (const std::exception& e) {
+                LogError("mqttMsg creation failed (%s, e: '%s')", MQTT_HOST.c_str(), e.what());
                 return -1;
             }
             LogTrace("mqttMsg creation (host: '%s', clientId: '%s')", MQTT_HOST.c_str(), clientId.c_str());
@@ -437,13 +426,13 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
 
         if (json.empty())
             { throw std::runtime_error("json payload is empty"); }
-
-        return 0;
     }
     catch (const std::exception& e) {
-        LogError("metric json serialization failed (e: %s)", e.what());
+        LogError("metric json serialization failed (e: '%s')", e.what());
+        return -1;
     }
-    return -1;
+
+    return 0;
 }
 
 // proto metric mqtt publisher
@@ -458,12 +447,13 @@ static int mqttPublish(fty_proto_t* metric)
     // publish on metric topic
     std::string asset_{fty_proto_name(metric)};
     std::string metric_{fty_proto_type(metric)};
-#ifdef _USE_MOSQUITTO_
+
+#if defined _USE_MOSQUITTO_
     std::string topic{"/metric/fty-shm-mosq/" + asset_ + "/" + metric_};
-#endif
-#ifdef _USE_FTY_COMMON_MESSAGEBUS_
+#elif defined _USE_FTY_COMMON_MESSAGEBUS_
     std::string topic{"/metric/fty-shm-msg/" + asset_ + "/" + metric_};
 #endif
+
     r = mqClient.publish(topic, json);
     if (r != 0) return -2;
 
@@ -471,18 +461,18 @@ static int mqttPublish(fty_proto_t* metric)
 }
 
 // proto metric builder
-// returns valid object (to be freed) if success, else NULL
+// returns a valid object (to be freed) if success, else NULL
 static fty_proto_t* protoMetric(const std::string& metric, const std::string& asset, const std::string& value, const std::string& unit, uint32_t ttl)
 {
     fty_proto_t* proto = fty_proto_new(FTY_PROTO_METRIC);
-    if (proto) {
-        fty_proto_set_type(proto, "%s", metric.empty() ? "" : metric.c_str());
-        fty_proto_set_name(proto, "%s", asset.empty() ? "" : asset.c_str());
-        fty_proto_set_value(proto, "%s", value.empty() ? "" : value.c_str());
-        fty_proto_set_unit(proto, "%s", unit.empty() ? "" : unit.c_str());
-        fty_proto_set_ttl(proto, ttl);
-    }
-    return proto; // NULL or valid object
+    if (!proto) return NULL;
+
+    fty_proto_set_type(proto, "%s", metric.empty() ? "" : metric.c_str());
+    fty_proto_set_name(proto, "%s", asset.empty() ? "" : asset.c_str());
+    fty_proto_set_value(proto, "%s", value.empty() ? "" : value.c_str());
+    fty_proto_set_unit(proto, "%s", unit.empty() ? "" : unit.c_str());
+    fty_proto_set_ttl(proto, ttl);
+    return proto;
 }
 
 //
