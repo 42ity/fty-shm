@@ -34,7 +34,7 @@
     #include <ctime>
 #elif defined _USE_FTY_COMMON_MESSAGEBUS_
     #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS_ ===="
-    #include <fty_common_messagebus.h>
+    #include <fty/messagebus/MsgBusFactory.hpp>
 #else
     #error "compile option required"
 #endif
@@ -308,11 +308,11 @@ public:
         if (r != 0) return -1;
 
         try {
-            messagebus::Message msg;
+            fty::messagebus::mqttv5::MqttMessage msg;
             msg.userData().push_back(data);
             msg.metaData().clear();
-            msg.metaData().emplace(messagebus::Message::FROM, "fty-shm-mqtt-msg");
-            msg.metaData().emplace(messagebus::Message::SUBJECT, "pub-metric");
+            msg.metaData().emplace(fty::messagebus::FROM, "fty-shm-mqtt-msg");
+            msg.metaData().emplace(fty::messagebus::SUBJECT, "pub-metric");
             m_instance->publish(topic, msg);
         }
         catch (const std::exception& e) {
@@ -329,7 +329,7 @@ private:
     const std::string MQTT_HOST{"tcp://localhost:1883"};
 
     // members
-    messagebus::IMessageBus* m_instance{nullptr}; // client instance
+    fty::messagebus::mqttv5::MessageBusMqtt* m_instance{nullptr}; // client instance
     bool m_isConnected{false}; // instance con. state
 
     // client connect
@@ -341,7 +341,7 @@ private:
             const std::string clientId{"fty-shm-mqtt-msg-" + std::to_string(getpid())};
             try {
                 m_isConnected = false;
-                m_instance = messagebus::MqttMsgBus(MQTT_HOST, clientId);
+                m_instance = fty::messagebus::MessageBusFactory::createMqttMsgBus(MQTT_HOST, clientId);
                 if (!m_instance)
                     { throw std::runtime_error("MqttMsgBus() returns NULL"); }
             }
