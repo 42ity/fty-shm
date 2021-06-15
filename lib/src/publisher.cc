@@ -311,8 +311,8 @@ public:
             fty::messagebus::mqttv5::MqttMessage msg;
             msg.userData().push_back(data);
             msg.metaData().clear();
-            msg.metaData().emplace(fty::messagebus::FROM, "fty-shm-mqtt-msg");
-            msg.metaData().emplace(fty::messagebus::SUBJECT, "pub-metric");
+            msg.metaData().emplace(fty::messagebus::FROM, CLIENT_NAME);
+            msg.metaData().emplace(fty::messagebus::SUBJECT, MSG_METADATA_SUBJECT);
             m_instance->publish(topic, msg);
         }
         catch (const std::exception& e) {
@@ -327,6 +327,8 @@ public:
 private:
     // connect conf.
     const std::string MQTT_HOST{"tcp://localhost:1883"};
+    const std::string CLIENT_NAME{"fty-shm"};
+    const std::string MSG_METADATA_SUBJECT{"metric"}; // publish()
 
     // members
     fty::messagebus::mqttv5::MessageBusMqtt* m_instance{nullptr}; // client instance
@@ -338,18 +340,18 @@ private:
     {
         // create instance if none
         if (!m_instance) {
-            const std::string clientId{"fty-shm-mqtt-msg-" + std::to_string(getpid())};
             try {
                 m_isConnected = false;
-                m_instance = fty::messagebus::MessageBusFactory::createMqttMsgBus(MQTT_HOST, clientId);
+                m_instance = fty::messagebus::MessageBusFactory::createMqttMsgBus(MQTT_HOST, CLIENT_NAME);
                 if (!m_instance)
                     { throw std::runtime_error("MqttMsgBus() returns NULL"); }
             }
             catch (const std::exception& e) {
-                LogError("mqttMsg creation failed (%s, e: '%s')", MQTT_HOST.c_str(), e.what());
+                LogError("mqttMsg creation failed (host: '%s', clientName: '%s', e: '%s')",
+                    MQTT_HOST.c_str(), CLIENT_NAME.c_str(), e.what());
                 return -1;
             }
-            LogTrace("mqttMsg creation (host: '%s', clientId: '%s')", MQTT_HOST.c_str(), clientId.c_str());
+            LogTrace("mqttMsg creation (host: '%s', clientName: '%s')", MQTT_HOST.c_str(), CLIENT_NAME.c_str());
         }
 
         // connect to host if not
@@ -445,14 +447,10 @@ static int mqttPublish(fty_proto_t* metric)
     if (r != 0) return -1;
 
     // publish on metric topic
+    // see https://confluence-prod.tcc.etn.com/display/BiosWiki/MQTT+on+IPM2
     std::string asset_{fty_proto_name(metric)};
     std::string metric_{fty_proto_type(metric)};
-
-#if defined _USE_MOSQUITTO_
-    std::string topic{"/metric/fty-shm-mosq/" + asset_ + "/" + metric_};
-#elif defined _USE_FTY_COMMON_MESSAGEBUS_
-    std::string topic{"/metric/fty-shm-msg/" + asset_ + "/" + metric_};
-#endif
+    std::string topic{"/etn/t/metric/fty-shm/" + asset_ + "/" + metric_};
 
     r = mqClient.publish(topic, json);
     if (r != 0) return -2;
