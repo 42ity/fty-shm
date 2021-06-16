@@ -38,18 +38,18 @@
 
 static int parse_ttl(char* ttl_str, time_t& ttl)
 {
-    char *err;
-    int res;
-
     // Delete the '\n'
-    int len = strlen(ttl_str) -1;
+    size_t len = strlen(ttl_str) -1;
     if(ttl_str[len] == '\n')
       ttl_str[len] = '\0';
-    res = strtol(ttl_str, &err, 10);
+
+    char *err = nullptr;
+    long int res = strtol(ttl_str, &err, 10);
     if (err != ttl_str + TTL_LEN - 1) {
         errno = ERANGE;
         return -1;
     }
+
     ttl = res;
     return 0;
 }
