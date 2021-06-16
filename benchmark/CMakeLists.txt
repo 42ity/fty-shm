@@ -11,6 +11,7 @@ etn_target(exe ${TARGET_NAME}
         src/*.cc
         src/*.h
     USES
+        czmq
         fty_proto
         ${PROJECT_NAME}
     PRIVATE
