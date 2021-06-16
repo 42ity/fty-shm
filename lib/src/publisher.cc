@@ -29,10 +29,12 @@
 #define _USE_FTY_COMMON_MESSAGEBUS_
 
 #if defined _USE_MOSQUITTO_
+    // must link with mosquitto lib client
     #pragma message "==== PUBLISHER _USE_MOSQUITTO_ ===="
     #include <mosquitto.h>
     #include <ctime>
 #elif defined _USE_FTY_COMMON_MESSAGEBUS_
+    // must link with fty_common_messagebus_evol lib client
     #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS_ ===="
     #include <fty/messagebus/MsgBusFactory.hpp>
 #else
@@ -206,6 +208,8 @@ public:
     }
 
 private:
+    // instance client
+    const std::string CLIENT_NAME{"fty-shm"};
     // connect conf.
     const char* MQTT_HOST{"localhost"};
     const int MQTT_PORT{1883};
@@ -234,7 +238,7 @@ private:
 
         // create instance if none
         if (!m_instance) {
-            const std::string clientId{"fty-shm-mqtt-mosq" + std::to_string(getpid())};
+            const std::string clientId{CLIENT_NAME + std::to_string(getpid())};
             const bool cleanSession{true};
             m_isConnected = false;
             m_instance = mosquitto_new(clientId.c_str(), cleanSession, nullptr);
@@ -309,7 +313,7 @@ public:
 
         try {
             fty::messagebus::mqttv5::MqttMessage msg;
-            msg.userData().push_back(data);
+            msg.userData() = data;
             msg.metaData().clear();
             msg.metaData().emplace(fty::messagebus::FROM, CLIENT_NAME);
             msg.metaData().emplace(fty::messagebus::SUBJECT, MSG_METADATA_SUBJECT);
@@ -331,7 +335,7 @@ private:
     const std::string MSG_METADATA_SUBJECT{"metric"}; // publish()
 
     // members
-    fty::messagebus::mqttv5::MessageBusMqtt* m_instance{nullptr}; // client instance
+    fty::messagebus::IMessageBus<fty::messagebus::mqttv5::MqttMessage>* m_instance{nullptr}; // client instance
     bool m_isConnected{false}; // instance con. state
 
     // client connect
