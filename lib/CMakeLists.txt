@@ -15,6 +15,9 @@ etn_target(shared ${PROJECT_NAME}
     USES
         czmq
         fty_proto
+        mosquitto #pub mqtt mosquitto lib client
+        fty_common_messagebus_evol #pub mqtt fty-common-messagebus client
+        cxxtools fty_common fty_common_logging #mqtt publisher
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
@@ -35,6 +38,9 @@ if (BUILD_TESTING)
         USES
             czmq
             fty_proto
+            mosquitto #pub mqtt mosquitto lib client
+            fty_common_messagebus_evol #pub mqtt fty-common-messagebus client
+            cxxtools fty_common fty_common_logging #mqtt publisher
             Catch2::Catch2
             stdc++fs
             log4cplus

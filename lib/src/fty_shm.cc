@@ -31,6 +31,7 @@
 #include <regex>
 
 #include "fty_shm.h"
+#include "publisher.h"
 
 #define DEFAULT_SHM_DIR "/run/42shm"
 
@@ -105,14 +106,16 @@ static int write_value(const char* filename, const char* value, const char* unit
 {
     FILE* file = fopen(filename, "w");
     if(file == NULL)
-      return -1;
+        return -1;
     if (ttl < 0)
         ttl = 0;
     std::string fmt(TTL_FMT);
     fmt.append(UNIT_FMT).append("%s");
     fprintf(file, fmt.c_str(), ttl, unit, value);
     if(fclose(file) < 0)
-      return -1;
+        return -1;
+
+    publishMetric(filename, value, unit, ttl); //mqtt-pub
     return 0;
 }
 
@@ -451,9 +454,9 @@ static int write_metric_data(const char* filename, fty_proto_t* metric)
     if(fclose(file) < 0)
       return -1;
 
+    publishMetric(metric); //mqtt-pub
     return 0;
 }
-
 
 int fty::shm::write_metric(fty_proto_t* metric)
 {
