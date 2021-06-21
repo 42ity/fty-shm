@@ -19,12 +19,8 @@
     =========================================================================
 */
 
-/*
-@header
-    fty_shm_cleanup - Garbage collector for fty-shm
-@discuss
-@end
-*/
+/// fty_shm_cleanup - Garbage collector for fty-shm
+
 
 #include <getopt.h>
 #include <iostream>
@@ -42,10 +38,10 @@ static int parse_ttl(char* ttl_str, time_t& ttl)
     int res;
 
     // Delete the '\n'
-    int len = strlen(ttl_str) -1;
+    int len = int(strlen(ttl_str) -1);
     if(ttl_str[len] == '\n')
       ttl_str[len] = '\0';
-    res = strtol(ttl_str, &err, 10);
+    res = int(strtol(ttl_str, &err, 10));
     if (err != ttl_str + TTL_LEN - 1) {
         errno = ERANGE;
         return -1;
@@ -75,7 +71,7 @@ static int clean_outdated_data(std::string filename) {
   char buf[128] = "";
   fgets(buf, sizeof(buf), file);
   fclose(file);
-  file = NULL;
+  file = nullptr;
 
   //get ttl
   time_t ttl = 0;
@@ -85,7 +81,7 @@ static int clean_outdated_data(std::string filename) {
 
   //data still valid ?
   if (ttl) {
-        time_t now = time(NULL);
+        time_t now = time(nullptr);
         if ((now - st.st_mtime) > ttl) {
             errno = ESTALE;
             remove(filename.c_str());
@@ -98,8 +94,8 @@ static int clean_outdated_data(std::string filename) {
 static int fty_shm_cleanup(std::string directory_path, bool /*verbose*/) {
   DIR *dir;
   struct dirent *ent;
-  if ((dir = opendir (directory_path.c_str())) != NULL) {
-    while ((ent = readdir (dir)) != NULL) {
+  if ((dir = opendir (directory_path.c_str())) != nullptr) {
+    while ((ent = readdir (dir)) != nullptr) {
       if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
         continue;
       std::string filename(directory_path);

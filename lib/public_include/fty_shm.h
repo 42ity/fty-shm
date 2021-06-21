@@ -19,8 +19,7 @@
     =========================================================================
 */
 
-#ifndef FTY_SHM_H_H_INCLUDED
-#define FTY_SHM_H_H_INCLUDED
+#pragma once
 
 #include <fty_proto.h>
 
@@ -30,8 +29,8 @@ extern "C" {
 
 #define FTY_SHM_METRIC_TYPE "0"
 
-//currently here until it can be merge in a fty_common* lib
-int fty_get_polling_interval();
+// currently here until it can be merge in a fty_common* lib
+int  fty_get_polling_interval();
 void fty_shm_set_default_polling_interval(int val);
 
 // This is the basic C API of the library. It allows to store and retrieve
@@ -69,47 +68,61 @@ void fty_shm_test(bool verbose);
 #include <unordered_map>
 #include <vector>
 
-namespace fty {
-namespace shm {
-    class shmMetrics
+namespace fty::shm {
+
+class shmMetrics
+{
+public:
+    ~shmMetrics();
+    // If you use this, DO NOT DELETE the fty_proto_t. It will be take
+    // care by the shmlMetrics's destructor.
+    //  (same warning if you access to it using iterator)
+    fty_proto_t*      get(int index);
+    fty_proto_t*      getDup(int index);
+    void              add(fty_proto_t* metric);
+    long unsigned int size();
+
+    typedef typename std::vector<fty_proto_t*>   vector_type;
+    typedef typename vector_type::iterator       iterator;
+    typedef typename vector_type::const_iterator const_iterator;
+
+    inline iterator begin() noexcept
     {
-        public :
-            ~shmMetrics();
-            //If you use this, DO NOT DELETE the fty_proto_t. It will be take
-            //care by the shmlMetrics's destructor.
-            //  (same warning if you access to it using iterator)
-            fty_proto_t* get(int index);
-            fty_proto_t* getDup(int index);
-            void add(fty_proto_t* metric);
-            long unsigned int size();
+        return m_metricsVector.begin();
+    }
+    inline const_iterator cbegin() const noexcept
+    {
+        return m_metricsVector.begin();
+    }
+    inline iterator end() noexcept
+    {
+        return m_metricsVector.end();
+    }
+    inline const_iterator cend() const noexcept
+    {
+        return m_metricsVector.end();
+    }
 
-            typedef typename std::vector<fty_proto_t*> vector_type;
-            typedef typename vector_type::iterator iterator;
-            typedef typename vector_type::const_iterator const_iterator;
+private:
+    std::vector<fty_proto_t*> m_metricsVector;
+};
 
-            inline iterator begin() noexcept { return m_metricsVector.begin(); }
-            inline const_iterator cbegin() const noexcept { return m_metricsVector.begin(); }
-            inline iterator end() noexcept { return m_metricsVector.end(); }
-            inline const_iterator cend() const noexcept { return m_metricsVector.end(); }
-        private :
-            std::vector<fty_proto_t*> m_metricsVector;
-    };
+// C++ versions of fty_shm_write_metric()
+int write_metric(fty_proto_t* metric);
+int write_metric(
+    const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
 
-    // C++ versions of fty_shm_write_metric()
-    int write_metric(fty_proto_t* metric);
-    int write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
+// C++ version of fty_shm_read_metric()
+int read_metric_value(const std::string& asset, const std::string& metric, std::string& value);
 
-    // C++ version of fty_shm_read_metric()
-    int read_metric_value(const std::string& asset, const std::string& metric, std::string& value);
+// if return = 0 : create a fty_proto which correspond to the metric. Must be
+// free by the caller.
+int read_metric(const std::string& asset, const std::string& metric, fty_proto_t** proto_metric);
 
-    //if return = 0 : create a fty_proto which correspond to the metric. Must be free by the caller.
-    int read_metric(const std::string& asset, const std::string& metric, fty_proto_t **proto_metric);
+// on success : fill result with the metrics still valid who matches the asset
+// and metric filters.
+int read_metrics(const std::string& asset, const std::string& metric, shmMetrics& result);
 
-    //on success : fill result with the metrics still valid who matches the asset and metric filters.
-    int read_metrics(const std::string& asset, const std::string& metric, shmMetrics& result);
-}//namespace shm
-}//namespace fty
+} // namespace fty::shm
 
 #endif // __cplusplus
-
-#endif // FTY_SHM_H_H_INCLUDED
