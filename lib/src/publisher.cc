@@ -26,17 +26,22 @@
 #include <cxxtools/jsonserializer.h>
 
 //#define _USE_MOSQUITTO_
-#define _USE_FTY_COMMON_MESSAGEBUS_
+//#define _USE_FTY_COMMON_MESSAGEBUS_EVOL_
+#define _USE_FTY_COMMON_MESSAGEBUS2_
 
 #if defined _USE_MOSQUITTO_
     // must link with mosquitto lib client
     #pragma message "==== PUBLISHER _USE_MOSQUITTO_ ===="
     #include <mosquitto.h>
     #include <ctime>
-#elif defined _USE_FTY_COMMON_MESSAGEBUS_
+#elif defined _USE_FTY_COMMON_MESSAGEBUS_EVOL_
     // must link with fty_common_messagebus_evol lib client
-    #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS_ ===="
+    #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS_EVOL_ ===="
     #include <fty/messagebus/MsgBusFactory.hpp>
+#elif defined _USE_FTY_COMMON_MESSAGEBUS2_
+    // must link with fty_common_messagebus2 lib client
+    #pragma message "==== PUBLISHER _USE_FTY_COMMON_MESSAGEBUS2_ ===="
+    //#include <fty/messagebus/MsgBusFactory.hpp>
 #else
     #error "compile option required"
 #endif
@@ -147,7 +152,8 @@ private:
 #define LogFatal(...) logger.log(log4cplus::FATAL_LOG_LEVEL, __VA_ARGS__)
 
 //
-// mqClient, simple mqtt client (mosquitto vs fty-common-messagebus)
+// mqClient, mqtt publisher client
+// over mosquitto, fty-common-messagebus-evol, fty-common-messagebus2...
 //
 
 #if defined _USE_MOSQUITTO_
@@ -287,19 +293,20 @@ private:
         m_instance = nullptr;
     }
 } mqClient;
+// endif _USE_MOSQUITTO_
 
-#elif defined _USE_FTY_COMMON_MESSAGEBUS_ // _USE_MOSQUITTO_
+#elif defined _USE_FTY_COMMON_MESSAGEBUS_EVOL_
 
-static struct ftyCommonMessagebusClient {
+static struct ftyCommonMessagebusEvolClient {
 public:
-    ftyCommonMessagebusClient()
+    ftyCommonMessagebusEvolClient()
     {
         LogInit();
 
         LogInfo("mqttMsg host (%s)", MQTT_HOST.c_str());
     }
 
-    ~ftyCommonMessagebusClient()
+    ~ftyCommonMessagebusEvolClient()
     {
         destroy();
     }
@@ -395,8 +402,128 @@ private:
         m_instance = nullptr;
     }
 } mqClient;
+//endif _USE_FTY_COMMON_MESSAGEBUS_EVOL_
 
-#endif //_USE_FTY_COMMON_MESSAGEBUS_
+#elif defined _USE_FTY_COMMON_MESSAGEBUS2_
+
+static struct ftyCommonMessagebus2Client {
+public:
+    ftyCommonMessagebus2Client()
+    {
+        LogInit();
+
+        LogInfo("mqttMsg host (%s)", MQTT_HOST.c_str());
+    }
+
+    ~ftyCommonMessagebus2Client()
+    {
+        destroy();
+    }
+
+    // client publish (data on topic)
+    // returns 0 if success, else <0
+    int publish(const std::string& topic, const std::string& data)
+    {
+        int r = connect();
+        if (r != 0) return -1;
+
+        LogWarn("mqttMsg publish NOT IMPLEMENTED (topic: '%s')", topic.c_str());
+        return -100;
+/**
+        try {
+            fty::messagebus::mqttv5::MqttMessage msg;
+            msg.userData() = data;
+            msg.metaData().clear();
+            msg.metaData().emplace(fty::messagebus::FROM, CLIENT_NAME);
+            msg.metaData().emplace(fty::messagebus::SUBJECT, MSG_METADATA_SUBJECT);
+            m_instance->publish(topic, msg);
+        }
+        catch (const std::exception& e) {
+            LogError("mqttMsg publish failed (topic: '%s', e: '%s')", topic.c_str(), e.what());
+            return -2;
+        }
+
+        LogInfo("mqttMsg publish (topic: '%s')", topic.c_str());
+        return 0;
+**/
+    }
+
+private:
+    // connect conf.
+    const std::string MQTT_HOST{"tcp://localhost:1883"};
+    const std::string CLIENT_NAME{"fty-shm"};
+    const std::string MSG_METADATA_SUBJECT{"metric"}; // publish()
+
+    // members
+    //fty::messagebus::IMessageBus<fty::messagebus::mqttv5::MqttMessage>* m_instance{nullptr}; // client instance
+    bool m_isConnected{false}; // instance con. state
+
+    // client connect
+    // returns 0 if success, else <0
+    int connect()
+    {
+        LogWarn("mqttMsg connect NOT IMPLEMENTED");
+        return -100;
+/**
+        // create instance if none
+        if (!m_instance) {
+            try {
+                m_isConnected = false;
+                m_instance = fty::messagebus::MessageBusFactory::createMqttMsgBus(MQTT_HOST, CLIENT_NAME);
+                if (!m_instance)
+                    { throw std::runtime_error("MqttMsgBus() returns NULL"); }
+            }
+            catch (const std::exception& e) {
+                LogError("mqttMsg creation failed (host: '%s', clientName: '%s', e: '%s')",
+                    MQTT_HOST.c_str(), CLIENT_NAME.c_str(), e.what());
+                return -1;
+            }
+            LogTrace("mqttMsg creation (host: '%s', clientName: '%s')", MQTT_HOST.c_str(), CLIENT_NAME.c_str());
+        }
+
+        // connect to host if not
+        if (!m_isConnected) {
+            try {
+                m_instance->connect();
+                m_isConnected = true;
+            }
+            catch (const std::exception& e) {
+                LogError("mqttMsg connect failed (host: '%s', e: '%s')", MQTT_HOST.c_str(), e.what());
+                return -2;
+            }
+            LogTrace("mqttMsg connect (host: '%s')", MQTT_HOST.c_str());
+        }
+
+        return 0;
+**/
+    }
+
+    // client disconnect
+    void disconnect()
+    {
+/**
+        if (m_instance && m_isConnected) {
+            LogTrace("mqttMsg disconnected (nop)");
+        }
+**/
+        m_isConnected = false;
+    }
+
+    // client destroy
+    void destroy()
+    {
+        disconnect();
+/**
+        if (m_instance) {
+            delete m_instance;
+            LogTrace("mqttMsg released");
+        }
+        m_instance = nullptr;
+**/
+    }
+} mqClient;
+
+#endif //_USE_FTY_COMMON_MESSAGEBUS2_
 
 // proto metric json serializer
 // returns 0 if success, else <0

@@ -28,8 +28,9 @@ Build-Depends: debhelper (>= 9),
     pkg-config,
     libczmq-dev (>= 3.0.2),
     libfty-proto-dev,
-    libmosquitto-dev, libcxxtools-dev, libfty-common-dev, libfty-common-logging-dev,
-    libfty-common-messagebus-evol-dev,
+    libcxxtools-dev, libfty-common-dev, libfty-common-logging-dev,
+#    libmosquitto-dev,
+#    libfty-common-messagebus-evol-dev,
     systemd,
     dh-systemd,
     asciidoc-base | asciidoc, xmlto,
@@ -48,7 +49,8 @@ Section: libdevel
 Depends:
     ${misc:Depends},
     libfty-proto-dev,
-    libfty-common-messagebus-evol-dev,
+#    libmosquitto-dev,
+#    libfty-common-messagebus-evol-dev,
     libfty-shm0 (= ${binary:Version})
 Description: fty-shm development tools
  This package contains development files for fty-shm:

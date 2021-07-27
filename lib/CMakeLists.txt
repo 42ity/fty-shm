@@ -15,8 +15,9 @@ etn_target(shared ${PROJECT_NAME}
     USES
         czmq
         fty_proto
-        mosquitto #pub mqtt mosquitto lib client
-        fty_common_messagebus_evol #pub mqtt fty-common-messagebus client
+#        mosquitto #pub mqtt mosquitto lib client
+#        fty_common_messagebus_evol #pub mqtt fty-common-messagebus client
+#        libfty_common_messagebus2_mqtt fty_common_messagebus2 #pub mqtt fty-common-messagebus2 client
         cxxtools fty_common fty_common_logging #mqtt publisher
 )
 
@@ -38,8 +39,9 @@ if (BUILD_TESTING)
         USES
             czmq
             fty_proto
-            mosquitto #pub mqtt mosquitto lib client
-            fty_common_messagebus_evol #pub mqtt fty-common-messagebus client
+#            mosquitto #pub mqtt mosquitto lib client
+#            fty_common_messagebus_evol #pub mqtt fty-common-messagebus client
+#            fty_common_messagebus2 #pub mqtt fty-common-messagebus2 client
             cxxtools fty_common fty_common_logging #mqtt publisher
             Catch2::Catch2
             stdc++fs
