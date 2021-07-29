@@ -19,12 +19,12 @@ etn_target(shared ${PROJECT_NAME}
 ### mqtt client
 #        mosquitto # mosquitto lib client
 #        fty_common_messagebus_evol # fty-common-messagebus-evol client
-#        fty_messagebus2_mqtt fty_common_messagebus2 # fty-common-messagebus2 client
+#        fty_common_messagebus2_mqtt fty_common_messagebus2 # fty-common-messagebus2 client
 ###
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE libfty_common_messagebus2.so)
-target_link_libraries(${PROJECT_NAME} PRIVATE libfty_messagebus2_mqtt.so)
+target_link_libraries(${PROJECT_NAME} PRIVATE libfty_common_messagebus2_mqtt.so)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
 
@@ -46,7 +46,7 @@ if (BUILD_TESTING)
             fty_proto
 #            mosquitto #pub mqtt mosquitto lib client
 #            fty_common_messagebus_evol #pub mqtt fty-common-messagebus client
-#            fty-messagebus-mqtt fty_common_messagebus2 #pub mqtt fty-common-messagebus2 client
+#            fty_common_messagebus2_mqtt fty_common_messagebus2 #pub mqtt fty-common-messagebus2 client
             cxxtools fty_common fty_common_logging #mqtt publisher
             Catch2::Catch2
             stdc++fs
