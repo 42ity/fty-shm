@@ -31,6 +31,7 @@ Build-Depends: debhelper (>= 9),
     libcxxtools-dev, libfty-common-dev, libfty-common-logging-dev,
 #    libmosquitto-dev,
 #    libfty-common-messagebus-evol-dev,
+    libfty-common-messagebus2-dev,
     dh-autoreconf
 
 Package: libfty-shm0
@@ -48,6 +49,7 @@ Depends:
     libfty-proto-dev,
 #    libmosquitto-dev,
 #    libfty-common-messagebus-evol-dev,
+    libfty-common-messagebus2-dev,
     libfty-shm0 (= ${binary:Version})
 Description: fty-shm development tools
  This package contains development files for fty-shm:
