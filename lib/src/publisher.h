@@ -16,18 +16,31 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
     =========================================================================
 */
-
-#ifndef PUBLISHER_H_INCLUDED
-#define PUBLISHER_H_INCLUDED
+#pragma once
 
 #include <fty_proto.h>
 #include <string>
+#include <memory>
 
-// publishMetric()
-// returns 0 if success, else <0
+namespace fty::messagebus
+{
+        class MessageBus;
+}
 
-int publishMetric(fty_proto_t* metric);
-int publishMetric(const std::string& metric, const std::string& asset, const std::string& value, const std::string& unit, uint32_t ttl);
-int publishMetric(const std::string& fileName, const std::string& value, const std::string& unit, uint32_t ttl);
+namespace fty::shm
+{
+    class Publisher
+    {
+    public:
+        //Singleton methods
+        static int publishMetric(fty_proto_t* metric);
+        static int publishMetric(const std::string& metric, const std::string& asset, const std::string& value, const std::string& unit, uint32_t ttl);
+        static int publishMetric(const std::string& fileName, const std::string& value, const std::string& unit, uint32_t ttl);
 
-#endif
+    private:
+        Publisher();
+        static Publisher& getInstance();
+
+        std::shared_ptr<fty::messagebus::MessageBus> msgBus;
+    };
+}

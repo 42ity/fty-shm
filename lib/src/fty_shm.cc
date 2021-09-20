@@ -30,7 +30,6 @@
 
 #include <cstring>
 
-
 #define DEFAULT_SHM_DIR "/run/42shm"
 
 #define SEPARATOR     '@'
@@ -45,6 +44,8 @@
 
 // Convenience macros
 #define FREE(x) (free(x), (x) = nullptr)
+
+using namespace fty::shm;
 
 void fty_shm_set_default_polling_interval(int val)
 {
@@ -114,7 +115,7 @@ static int write_value(const char* filename, const char* value, const char* unit
     if(fclose(file) < 0)
         return -1;
 
-    publishMetric(filename, value, unit, ttl); //mqtt-pub
+    Publisher::publishMetric(filename, value, unit, static_cast<uint32_t>(ttl)); //mqtt-pub
     return 0;
 }
 
@@ -450,7 +451,7 @@ static int write_metric_data(const char* filename, fty_proto_t* metric)
     if (fclose(file) < 0)
         return -1;
 
-    publishMetric(metric); //mqtt-pub
+    Publisher::publishMetric(metric); //mqtt-pub
     return 0;
 }
 

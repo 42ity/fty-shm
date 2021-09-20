@@ -35,10 +35,11 @@
 static int parse_ttl(char* ttl_str, time_t& ttl)
 {
     // Delete the '\n'
+    char *err;
     int len = int(strlen(ttl_str) -1);
     if(ttl_str[len] == '\n')
       ttl_str[len] = '\0';
-    res = int(strtol(ttl_str, &err, 10));
+    int res = int(strtol(ttl_str, &err, 10));
     if (err != ttl_str + TTL_LEN - 1) {
         errno = ERANGE;
         return -1;
