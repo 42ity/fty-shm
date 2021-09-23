@@ -26,10 +26,11 @@ Build-Depends: debhelper (>= 9),
     cmake (>=3.0),
     fty-cmake-dev,
     libczmq-dev (>= 3.0.2),
+    libfty-utils-dev,
     libfty-proto-dev,
-    libcxxtools-dev, libfty-common-dev, libfty-common-logging-dev,
-#    libmosquitto-dev,
-#    libfty-common-messagebus-evol-dev,
+    libcxxtools-dev,
+    libfty-common-dev,
+    libfty-common-logging-dev,
     libfty-common-messagebus2-dev,
     dh-autoreconf
 
@@ -46,8 +47,6 @@ Section: libdevel
 Depends:
     ${misc:Depends},
     libfty-proto-dev,
-#    libmosquitto-dev,
-#    libfty-common-messagebus-evol-dev,
     libfty-common-messagebus2-dev,
     libfty-shm0 (= ${binary:Version})
 Description: fty-shm development tools
