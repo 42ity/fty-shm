@@ -21,8 +21,6 @@
 
 /// fty_shm_cleanup - Garbage collector for fty-shm
 
-
-#include <getopt.h>
 #include <iostream>
 #include <string.h>
 #include <unistd.h>
@@ -40,7 +38,7 @@ static int parse_ttl(char* ttl_str, time_t& ttl)
     // Delete the '\n'
     int len = int(strlen(ttl_str) -1);
     if(ttl_str[len] == '\n')
-      ttl_str[len] = '\0';
+        ttl_str[len] = '\0';
     res = int(strtol(ttl_str, &err, 10));
     if (err != ttl_str + TTL_LEN - 1) {
         errno = ERANGE;
@@ -50,108 +48,126 @@ static int parse_ttl(char* ttl_str, time_t& ttl)
     return 0;
 }
 
-// -1 : not a valid metric/data
+// -2 : file deletion failed
+// -1 : invalid file or metric/data
 //  0 : outdated data (file removed)
 //  1 : up to date data
-static int clean_outdated_data(std::string filename) {
-  FILE* file = fopen(filename.c_str(), "r");
+static int clean_outdated_data(std::string filename)
+{
+    FILE* file = fopen(filename.c_str(), "r");
+    if (!file) {
+        log_error("open %s failed (%s)", filename.c_str(), strerror(errno));
+        return -1;
+    }
 
-  if (!file) {
-    log_error("Cannot open %s for cleaning", filename.c_str());
-    return -1;
-  }
+    struct stat st;
+    if(fstat(fileno(file), &st) < 0) {
+        fclose(file);
+        log_error("stat %s failed (%s)", filename.c_str(), strerror(errno));
+        return -1; // invalid file
+    }
 
-  struct stat st;
-  if(fstat(fileno(file), &st) < 0) {
+    // read file in buf
+    char buf[128] = "";
+    fgets(buf, sizeof(buf), file);
     fclose(file);
-    return -1;
-  }
+    file = nullptr;
 
-  //read file in buf
-  char buf[128] = "";
-  fgets(buf, sizeof(buf), file);
-  fclose(file);
-  file = nullptr;
+    // get ttl
+    time_t ttl = 0;
+    if (parse_ttl(buf, ttl) < 0) {
+        return -1; // invalid data
+    }
 
-  //get ttl
-  time_t ttl = 0;
-  if (parse_ttl(buf, ttl) < 0) {
-    return -1;
-  }
-
-  //data still valid ?
-  if (ttl) {
+    // data still valid ?
+    if (ttl) {
         time_t now = time(nullptr);
         if ((now - st.st_mtime) > ttl) {
             errno = ESTALE;
-            remove(filename.c_str());
-            return 0;
+            if (remove(filename.c_str()) != 0) {
+                log_error("remove %s failed (%s)", filename.c_str(), strerror(errno));
+                return -2; // rm failed
+            }
+            return 0; // removed
         }
-  }
-  return 1;
-}
-
-static int fty_shm_cleanup(std::string directory_path, bool /*verbose*/) {
-  DIR *dir;
-  struct dirent *ent;
-  if ((dir = opendir (directory_path.c_str())) != nullptr) {
-    while ((ent = readdir (dir)) != nullptr) {
-      if(strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
-        continue;
-      std::string filename(directory_path);
-      filename.append("/").append(ent->d_name);
-      if(ent->d_type == DT_DIR) {
-        fty_shm_cleanup(filename, false);
-      } else {
-        clean_outdated_data(filename);
-      }
     }
-    closedir (dir);
-  }
-  return 0;
+    return 1; // up to date
 }
 
-static const char help_text[]
-    = "fty-shm-cleanup [options] ...\n"
-      "  -v, --verbose         show verbose output\n"
-      "  -h, --help            display this help text and exit\n";
+// cleanup outdated metrics from PATH
+// returns 0 if success, else <0
+static int fty_shm_cleanup(const std::string& directory_path, size_t &removedFilesCnt, bool verbose)
+{
+    if (verbose) {
+        log_info("shm cleanup directory '%s'", directory_path.c_str());
+    }
+
+    DIR *dir = opendir(directory_path.c_str());
+    if (dir == nullptr) {
+        log_error("opendir %s failed (%s)", directory_path.c_str(), strerror(errno));
+        return -1;
+    }
+
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != nullptr) {
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+            continue;
+        std::string filename(directory_path);
+        filename.append("/").append(ent->d_name);
+        if (ent->d_type == DT_DIR) { // recursive
+            fty_shm_cleanup(filename, removedFilesCnt, verbose);
+        }
+        else {
+            if (clean_outdated_data(filename) == 0) {
+                removedFilesCnt++;
+            }
+        }
+    }
+
+    closedir(dir);
+    return 0;
+}
 
 int main(int argc, char* argv[])
 {
+    const char* agent_name = "fty-shm-cleanup";
+    const std::string path{"/run/42shm"};
     bool verbose = false;
 
-    static struct option long_opts[] = {
-        { "help", no_argument, 0, 'h' },
-        { "verbose", no_argument, 0, 'v' }
-    };
+    // handle args
+    {
+        static const char help_text[]
+            = "fty-shm-cleanup [options] ...\n"
+              "  -v    verbose output\n"
+              "  -h    display this help text and exit\n";
 
-    std::string path("/run/42shm");
-
-    int c = 0;
-    while (c >= 0) {
-        c = getopt_long(argc, argv, "hv", long_opts, 0);
-
-        switch (c) {
-        case 'v':
-            verbose = true;
-            break;
-        case 'h':
-            std::cout << help_text;
-            return 0;
-        case '?':
-            std::cerr << help_text;
-            return 1;
-        default:
-            // Should not happen
-            c = -1;
+        int argn;
+        for (argn = 1; argn < argc; argn++) {
+            const char* arg = argv[argn];
+            if (strcmp(arg, "-v") == 0) {
+                verbose = true;
+            }
+            else if (strcmp(arg, "-h") == 0) {
+                std::cout << help_text;
+                return EXIT_SUCCESS;
+            }
+            else {
+                std::cerr << help_text;
+                std::cerr << "unknown argument '" << std::string(arg) << "'" << std::endl;
+                return EXIT_FAILURE;
+            }
         }
     }
-    //  Insert main code here
-    if (verbose)
-        log_debug ("fty-shm-cleanup - Garbage collector for fty-shm");
 
-    if (fty_shm_cleanup(path, verbose) < 0)
-        log_error ("fty-shm cleanup returned error: %s", strerror(errno));
+    ftylog_setInstance(agent_name, "");
+    log_info("%s:\tStarted...", agent_name);
 
-    return 0;
+    size_t removedFilesCnt = 0;
+    int r = fty_shm_cleanup(path, removedFilesCnt, verbose);
+    if (r != 0) {
+        log_error("%s:\tFailed (r: %d, %zu metric(s) removed)", agent_name, r, removedFilesCnt);
+        return EXIT_FAILURE;
+    }
+    log_info("%s:\tEnded (%zu metric(s) removed)", agent_name, removedFilesCnt);
+    return EXIT_SUCCESS;
 }
