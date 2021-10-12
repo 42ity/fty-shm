@@ -73,14 +73,14 @@ static int clean_outdated_data(std::string filename)
     fclose(file);
     file = nullptr;
 
-    // get ttl
-    time_t ttl = 0;
-    if (parse_ttl(buf, ttl) < 0) {
-        return -1; // invalid data
-    }
-
-    // data still valid ?
-    if (ttl) {
+  //get ttl
+  time_t ttl = -1;
+  if (parse_ttl(buf, ttl) < 0) {
+    return -1;
+  }
+  
+  //data still valid ?
+  if (ttl >= 0) {
         time_t now = time(nullptr);
         if ((now - st.st_mtime) > ttl) {
             errno = ESTALE;
