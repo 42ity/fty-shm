@@ -32,18 +32,19 @@
 
 static int parse_ttl(char* ttl_str, time_t& ttl)
 {
-    char *err;
-    int res;
-
     // Delete the '\n'
     int len = int(strlen(ttl_str) -1);
-    if(ttl_str[len] == '\n')
+    if (ttl_str[len] == '\n') {
         ttl_str[len] = '\0';
-    res = int(strtol(ttl_str, &err, 10));
+    }
+
+    char *err = NULL;
+    int res = int(strtol(ttl_str, &err, 10));
     if (err != ttl_str + TTL_LEN - 1) {
         errno = ERANGE;
         return -1;
     }
+
     ttl = res;
     return 0;
 }
@@ -78,7 +79,7 @@ static int clean_outdated_data(std::string filename)
   if (parse_ttl(buf, ttl) < 0) {
     return -1;
   }
-  
+
   //data still valid ?
   if (ttl >= 0) {
         time_t now = time(nullptr);

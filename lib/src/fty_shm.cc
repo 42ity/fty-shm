@@ -24,7 +24,11 @@
 #include "fty_shm.h"
 #include <assert.h>
 #include <regex>
-#include <string.h>
+
+#include "fty_shm.h"
+#include "publisher.h"
+
+#include <cstring>
 
 #define DEFAULT_SHM_DIR "/run/42shm"
 
@@ -40,6 +44,8 @@
 
 // Convenience macros
 #define FREE(x) (free(x), (x) = nullptr)
+
+using namespace fty::shm;
 
 void fty_shm_set_default_polling_interval(int val)
 {
@@ -106,8 +112,10 @@ static int write_value(const char* filename, const char* value, const char* unit
     std::string fmt(TTL_FMT);
     fmt.append(UNIT_FMT).append("%s");
     fprintf(file, fmt.c_str(), ttl, unit, value);
-    if (fclose(file) < 0)
+    if(fclose(file) < 0)
         return -1;
+
+    Publisher::publishMetric(filename, value, unit, static_cast<uint32_t>(ttl)); //mqtt-pub
     return 0;
 }
 
@@ -443,9 +451,9 @@ static int write_metric_data(const char* filename, fty_proto_t* metric)
     if (fclose(file) < 0)
         return -1;
 
+    Publisher::publishMetric(metric); //mqtt-pub
     return 0;
 }
-
 
 int fty::shm::write_metric(fty_proto_t* metric)
 {
