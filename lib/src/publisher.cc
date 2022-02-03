@@ -42,11 +42,16 @@ namespace fty::shm
         //Create the bus object
         msgBus = std::make_shared<mqtt::MessageBusMqtt>("fty-shm");
 
-        //Connect to the bus
-        fty::Expected<void> connectionRet = msgBus->connect();
-        if(! connectionRet) {
-            throw std::runtime_error(connectionRet.error());
-        }
+        if(msgBus != nullptr) {
+            //Connect to the bus
+            fty::Expected<void> connectionRet = msgBus->connect();
+            if(! connectionRet) {
+                logError("Error while connecting to mqtt bus {}", connectionRet.error());
+                msgBus = nullptr;
+            }
+        } else {
+            logError("Error while creating mqtt client");
+        }  
     }
 
     int Publisher::publishMetric(fty_proto_t* metric)
@@ -69,11 +74,16 @@ namespace fty::shm
             json);
 
         //Send the message
-        fty::Expected<void> sendRet = getInstance().msgBus->send(msg);
-        if(!sendRet) {
-            logError("Error while sending {}", sendRet.error());
-            return -2;
+        if(getInstance().msgBus) {
+            fty::Expected<void> sendRet = getInstance().msgBus->send(msg);
+            if(!sendRet) {
+                logError("Error while sending {}", sendRet.error());
+                return -2;
+            }
+        } else {
+            //logWarn("Mqtt is not connected");
         }
+
 
         return 0;
     }
