@@ -24,7 +24,7 @@
 
 */
 
-@Library('etn-ipm2-jenkins') _
+@Library('etn-ipm2-jenkins@CPE-move-coverity-out') _
 
 import params.CmakePipelineParams
 CmakePipelineParams parameters = new CmakePipelineParams()
