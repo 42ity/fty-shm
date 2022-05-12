@@ -44,9 +44,9 @@ namespace fty::shm
 
         if(msgBus != nullptr) {
             //Connect to the bus
-            fty::Expected<void> connectionRet = msgBus->connect();
+            fty::Expected<void, fty::messagebus::ComState> connectionRet = msgBus->connect();
             if(! connectionRet) {
-                logError("Error while connecting to mqtt bus {}", connectionRet.error());
+                logError("Error while connecting to mqtt bus {}", fty::messagebus::to_string(connectionRet.error()));
                 msgBus = nullptr;
             }
         } else {
@@ -75,9 +75,9 @@ namespace fty::shm
 
         //Send the message
         if(getInstance().msgBus) {
-            fty::Expected<void> sendRet = getInstance().msgBus->send(msg);
+            fty::Expected<void, fty::messagebus::DeliveryState> sendRet = getInstance().msgBus->send(msg);
             if(!sendRet) {
-                logError("Error while sending {}", sendRet.error());
+                logError("Error while sending {}", fty::messagebus::to_string(sendRet.error()));
                 return -2;
             }
         } else {
