@@ -24,13 +24,13 @@
 #include <fty_log.h>
 #include <cxxtools/jsonserializer.h>
 
-#include <fty/messagebus/MessageBus.h>
-#include <fty/messagebus/Message.h>
-#include <fty/messagebus/mqtt/MessageBusMqtt.h>
+#include <fty/messagebus2/MessageBus.h>
+#include <fty/messagebus2/Message.h>
+#include <fty/messagebus2/mqtt/MessageBusMqtt.h>
 
 #include <fty/expected.h>
 
-using namespace fty::messagebus;
+using namespace fty::messagebus2;
 
 static int metric2JSON(fty_proto_t* metric, std::string& json);
 static fty_proto_t* protoMetric(const std::string& metric, const std::string& asset, const std::string& value, const std::string& unit, uint32_t ttl);
@@ -40,13 +40,13 @@ namespace fty::shm
     Publisher::Publisher()
     { 
         //Create the bus object
-        msgBus = std::make_shared<mqtt::MessageBusMqtt>("fty-shm");
+        msgBus = std::make_shared<mqtt::messagebus2Mqtt>("fty-shm");
 
         if(msgBus != nullptr) {
             //Connect to the bus
-            fty::Expected<void, fty::messagebus::ComState> connectionRet = msgBus->connect();
+            fty::Expected<void, fty::messagebus2::ComState> connectionRet = msgBus->connect();
             if(! connectionRet) {
-                logError("Error while connecting to mqtt bus {}", fty::messagebus::to_string(connectionRet.error()));
+                logError("Error while connecting to mqtt bus {}", fty::messagebus2::to_string(connectionRet.error()));
                 msgBus = nullptr;
             }
         } else {
@@ -75,9 +75,9 @@ namespace fty::shm
 
         //Send the message
         if(getInstance().msgBus) {
-            fty::Expected<void, fty::messagebus::DeliveryState> sendRet = getInstance().msgBus->send(msg);
+            fty::Expected<void, fty::messagebus2::DeliveryState> sendRet = getInstance().msgBus->send(msg);
             if(!sendRet) {
-                logError("Error while sending {}", fty::messagebus::to_string(sendRet.error()));
+                logError("Error while sending {}", fty::messagebus2::to_string(sendRet.error()));
                 return -2;
             }
         } else {

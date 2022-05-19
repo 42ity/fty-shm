@@ -22,7 +22,7 @@
 #include <string>
 #include <memory>
 
-namespace fty::messagebus
+namespace fty::messagebus2
 {
         class MessageBus;
 }
@@ -41,6 +41,6 @@ namespace fty::shm
         Publisher();
         static Publisher& getInstance();
 
-        std::shared_ptr<fty::messagebus::MessageBus> msgBus;
+        std::shared_ptr<fty::messagebus2::messagebus2> msgBus;
     };
 }

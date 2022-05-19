@@ -18,7 +18,7 @@ etn_target(shared ${PROJECT_NAME}
         fty_proto
         cxxtools
         fty_common
-        fty-common-messagebus2-mqtt
+        fty-messagebus2-mqtt
         fty_common_logging
 )
 
