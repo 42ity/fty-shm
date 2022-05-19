@@ -40,7 +40,7 @@ namespace fty::shm
     Publisher::Publisher()
     { 
         //Create the bus object
-        msgBus = std::make_shared<mqtt::messagebus2Mqtt>("fty-shm");
+        msgBus = std::make_shared<mqtt::MessageBusMqtt>("fty-shm");
 
         if(msgBus != nullptr) {
             //Connect to the bus

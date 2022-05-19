@@ -41,6 +41,6 @@ namespace fty::shm
         Publisher();
         static Publisher& getInstance();
 
-        std::shared_ptr<fty::messagebus2::messagebus2> msgBus;
+        std::shared_ptr<fty::messagebus2::MessageBus> msgBus;
     };
 }
