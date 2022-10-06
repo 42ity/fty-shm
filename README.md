@@ -18,7 +18,7 @@ make
 sudo make install
 ```
 
-## Client usage // sinan test
+## Client usage
 ```
 fty-shm-cli [options]
 fty-shm-cli [--details / -d] device [filter] print all information about the device

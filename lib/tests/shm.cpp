@@ -14,15 +14,15 @@
 // test outputs directory
 #define SELFTEST_RW "."
 
-TEST_CASE("shm test")
+TEST_CASE("read-write test")
 {
     std::string  value;
-    fty_proto_t *proto_metric, *proto_metric_result;
+    fty_proto_t *proto_metric;
 
     REQUIRE(fty_shm_set_test_dir(SELFTEST_RW) == 0);
 
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
-
+    
     REQUIRE(fty::shm::read_metric_value("asset", "metric", value) == 0);
     assert(value == "here_is_my_value");
     REQUIRE(fty::shm::read_metric("asset", "metric", &proto_metric) == 0);
@@ -43,20 +43,42 @@ TEST_CASE("shm test")
 
     result = fty_proto_unit(proto_metric);
     REQUIRE(result);
+    CHECK(streq(result, "unit?"));
 
     // Wait the end of the data and test no more metrics
     zclock_sleep(3000);
     value = "none";
     REQUIRE(fty::shm::read_metric_value("asset", "metric", value) < 0);
+
     CHECK(value == "none");
 
+    fty_shm_delete_test_dir();
+    fty_proto_destroy(&proto_metric);
+}
+
+TEST_CASE("write-read with aux test")
+{
     // test write-read proto metric (with aux)
+    fty_proto_t *proto_metric, *proto_metric_result;
+
+    proto_metric = fty_proto_new(FTY_PROTO_METRIC);
+    proto_metric_result = fty_proto_new(FTY_PROTO_METRIC);
+
+    REQUIRE(fty_shm_set_test_dir(SELFTEST_RW) == 0);
+
+    fty_proto_set_ttl(proto_metric, 2);
+    fty_proto_set_name(proto_metric, "%s", "asset");
+    fty_proto_set_type(proto_metric, "%s", "metric");
+    fty_proto_set_value(proto_metric, "%s", "here_is_my_value");
+    fty_proto_set_unit(proto_metric, "%s", "unit?");
+    
     fty_proto_aux_insert(proto_metric, "myfirstaux", "%s", "value_first_aux");
     fty_proto_aux_insert(proto_metric, "mysecondaux", "%s", "value_second_aux");
     REQUIRE(fty::shm::write_metric(proto_metric) == 0);
-
+    
     REQUIRE(fty::shm::read_metric("asset", "metric", &proto_metric_result) == 0);
-    result = fty_proto_name(proto_metric_result);
+    REQUIRE(proto_metric_result);
+    const char * result = fty_proto_name(proto_metric_result);
     REQUIRE(result);
     CHECK(streq(result, "asset"));
 
@@ -71,7 +93,7 @@ TEST_CASE("shm test")
 
     result = fty_proto_unit(proto_metric_result);
     REQUIRE(result);
-    // assert (result!=nullptr && streq (result, "unit?"));
+    CHECK(streq(result, "unit?"));
 
     result = fty_proto_aux_string(proto_metric_result, "myfirstaux", "none");
     REQUIRE(result);
@@ -86,7 +108,16 @@ TEST_CASE("shm test")
 
     zclock_sleep(3000);
 
+    fty_shm_delete_test_dir();
+}
+
+TEST_CASE("update test")
+{
     // test metric "update"
+    std::string value;
+
+    REQUIRE(fty_shm_set_test_dir(SELFTEST_RW) == 0);
+
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_real_value", "unit?", 2) == 0);
     REQUIRE(fty::shm::read_metric_value("asset", "metric", value) == 0);
@@ -114,7 +145,7 @@ TEST_CASE("shm test")
         CHECK(resultM.size() == 4);
         for (auto& metric : resultM) {
             const char* resultT = fty_proto_type(metric);
-            result        = fty_proto_name(metric);
+            const char* result = fty_proto_name(metric);
             REQUIRE(result);
             CHECK((streq(result, "asset") == 0 || streq(result, "asset2") == 0));
 
@@ -186,7 +217,14 @@ TEST_CASE("shm test")
         CHECK(resultM.size() == 4);
     }
 
+    fty_shm_delete_test_dir();
+}
+
+TEST_CASE("autoclean test")
+{
     // verify the autoclean
+    REQUIRE(fty_shm_set_test_dir(SELFTEST_RW) == 0);
+
     REQUIRE(fty::shm::write_metric("long", "duration", "here_the_metric", "stand", 10) == 0);
 
     // get the number of "file" in the directory
@@ -207,8 +245,8 @@ TEST_CASE("shm test")
     }
 
 
-    // we must have file number egals to number_of_metric + 2 (. and ..)
-    CHECK(dir_number == 11);
+    // we must have file number
+    CHECK(dir_number == 3);
     // wait the expiration of some metrics
     zclock_sleep(6000);
 
@@ -234,4 +272,13 @@ TEST_CASE("shm test")
     // only one metric file left
     CHECK(dir_number == 3);
     fty_shm_delete_test_dir();
+}
+
+TEST_CASE("poll interval test")
+{
+    fty_shm_set_default_polling_interval(30);
+    REQUIRE(fty_get_polling_interval() == 30);
+    
+    fty_shm_set_default_polling_interval(35);
+    REQUIRE(fty_get_polling_interval() == 35);
 }

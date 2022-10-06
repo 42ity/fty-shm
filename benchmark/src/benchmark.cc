@@ -134,7 +134,14 @@ void Benchmark::c_api_bench()
     timestamp("setup");
     if (do_write) {
         for (i = 0; i < NUM_METRICS; i++)
-            fty_shm_write_metric("bench_asset", names + i * METRIC_LEN, values + i * METRIC_LEN, "unit", 300);
+        {
+            fty::shm::write_metric("bench_asset", 
+                                    std::string(names + i * METRIC_LEN), 
+                                    std::string(values + i * METRIC_LEN), 
+                                    "unit",
+                                    300);
+        }
+            
         timestamp("writes");
     }
     if (do_read) {
