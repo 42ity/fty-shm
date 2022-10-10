@@ -52,13 +52,13 @@ using namespace fty::shm;
 void fty_shm_set_default_polling_interval(int val)
 {
     std::string s = std::to_string(val);
-    setenv(FTY_SHM_POLL_ENV, s.c_str(), 1);
+    setenv(POLL_ENV, s.c_str(), 1);
 }
 
 int fty_get_polling_interval()
 {
     static int val  = 30;
-    char*      data = getenv(FTY_SHM_POLL_ENV);
+    char*      data = getenv(POLL_ENV);
     if (data && strtol(data, nullptr, 10) > 0)
         return int(strtol(data, nullptr, 10));
     zconfig_t* config = zconfig_load(ZCONFIG_PATH);

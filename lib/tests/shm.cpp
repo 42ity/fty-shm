@@ -2,15 +2,6 @@
 #include <fty_proto.h>
 #include "public_include/fty_shm.h"
 
-// Version of assert() that prints the errno value for easier debugging
-#define check_err(expr)                                                                                                \
-    do {                                                                                                               \
-        if ((expr) < 0) {                                                                                              \
-            fprintf(stderr, __FILE__ ":%d: Assertion `%s' failed (%s)\n", __LINE__, #expr, strerror(errno));           \
-            abort();                                                                                                   \
-        }                                                                                                              \
-    } while (0)
-
 // test outputs directory
 #define SELFTEST_RW "."
 
@@ -106,6 +97,7 @@ TEST_CASE("write-read with aux test")
     fty_proto_destroy(&proto_metric_result);
     fty_proto_destroy(&proto_metric);
 
+    // wait the expiration of metrics
     zclock_sleep(3000);
 
     fty_shm_delete_test_dir();
