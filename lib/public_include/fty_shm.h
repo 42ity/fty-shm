@@ -46,8 +46,6 @@ int fty_shm_set_test_dir(const char* dir);
 // Clean the custom storage directory
 int fty_shm_delete_test_dir();
 
-void fty_shm_test(bool verbose);
-
 #ifdef __cplusplus
 }
 // More fancy stuff is possible with the C++ API. It is arguably not the

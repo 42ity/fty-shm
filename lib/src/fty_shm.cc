@@ -42,24 +42,26 @@
 
 #define UNIT_FMT "%s\n"
 
-// Convenience macros
-#define FREE(x) (free(x), (x) = nullptr)
+#define POLL_ENV        "FTY_SHM_TEST_POLLING_INTERVAL"
+#define AUTOCLEAN_ENV   "FTY_SHM_AUTOCLEAN"
+
+#define ZCONFIG_PATH "/etc/fty-nut/fty-nut.cfg"
 
 using namespace fty::shm;
 
 void fty_shm_set_default_polling_interval(int val)
 {
     std::string s = std::to_string(val);
-    setenv("FTY_SHM_TEST_POLLING_INTERVAL", s.c_str(), 1);
+    setenv(FTY_SHM_POLL_ENV, s.c_str(), 1);
 }
 
 int fty_get_polling_interval()
 {
     static int val  = 30;
-    char*      data = getenv("FTY_SHM_TEST_POLLING_INTERVAL");
+    char*      data = getenv(FTY_SHM_POLL_ENV);
     if (data && strtol(data, nullptr, 10) > 0)
         return int(strtol(data, nullptr, 10));
-    zconfig_t* config = zconfig_load("/etc/fty-nut/fty-nut.cfg");
+    zconfig_t* config = zconfig_load(ZCONFIG_PATH);
     if (config) {
         val = int(strtol(zconfig_get(config, "nut/polling_interval", std::to_string(val).c_str()), nullptr, 10));
         zconfig_destroy(&config);
@@ -160,7 +162,7 @@ static int read_value(const char* filename, T& value, T& unit, bool need_unit = 
         if (now - st.st_mtime > ttl) {
             errno = ESTALE;
             fclose(file);
-            char* valenv = getenv("FTY_SHM_AUTOCLEAN");
+            char* valenv = getenv(AUTOCLEAN_ENV);
             if (!valenv || strcmp(valenv, "OFF") != 0)
                 remove(filename);
             return -1;
@@ -215,7 +217,7 @@ int read_data_metric(const char* filename, fty_proto_t* proto_metric)
         if (now - st.st_mtime > ttl) {
             errno = ESTALE;
             fclose(file);
-            char* valenv = getenv("FTY_SHM_AUTOCLEAN");
+            char* valenv = getenv(AUTOCLEAN_ENV);
             if (!valenv || strcmp(valenv, "OFF") != 0)
                 remove(filename);
             return -1;
