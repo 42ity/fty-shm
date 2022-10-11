@@ -104,17 +104,6 @@ static int prepare_filename(
     return 0;
 }
 
-static char* dup_str(char* str, char*)
-{
-    return strdup(str);
-}
-
-// When working with std::string, we do not want to call strdup
-static char* dup_str(char* str, std::string)
-{
-    return str;
-}
-
 static int parse_ttl(char* ttl_str, time_t& ttl)
 {
     char* err;
@@ -133,65 +122,8 @@ static int parse_ttl(char* ttl_str, time_t& ttl)
     return 0;
 }
 
-// XXX: The error codes are somewhat arbitrary
-template <typename T>
-static int read_value(const char* filename, T& value, T& unit, bool need_unit = true)
-{
-    int         ret = -1;
-    struct stat st;
-    FILE*       file = nullptr;
-    char        buf[128];
-    time_t      now, ttl;
-    int         len;
-
-    file = fopen(filename, "r");
-    if (file == nullptr)
-        return -1;
-    if (fstat(fileno(file), &st) < 0)
-        goto shm_out_fd;
-
-    // get ttl
-    fgets(buf, sizeof(buf), file);
-
-    if (parse_ttl(buf, ttl) < 0)
-        goto shm_out_fd;
-
-    // data still valid ?
-    if (ttl) {
-        now = time(nullptr);
-        if (now - st.st_mtime > ttl) {
-            errno = ESTALE;
-            fclose(file);
-            char* valenv = getenv(AUTOCLEAN_ENV);
-            if (!valenv || strcmp(valenv, "OFF") != 0)
-                remove(filename);
-            return -1;
-        }
-    }
-
-    // get unit
-    fgets(buf, sizeof(buf), file);
-    // Delete the '\n'
-    len = int(strlen(buf) - 1);
-    if (buf[len] == '\n')
-        buf[len] = '\0';
-    if (need_unit) {
-        unit = dup_str(buf, T());
-    }
-    // get value
-    fgets(buf, sizeof(buf), file);
-    value = dup_str(buf, T());
-    fclose(file);
-    return 0;
-
-shm_out_fd:
-    fclose(file);
-    return ret;
-}
-
 int read_data_metric(const char* filename, fty_proto_t* proto_metric)
 {
-    int         ret = -1;
     struct stat st;
     FILE*       file = nullptr;
     char        buf[128];
@@ -200,16 +132,24 @@ int read_data_metric(const char* filename, fty_proto_t* proto_metric)
     int         len;
 
     file = fopen(filename, "r");
+
     if (file == nullptr)
         return -1;
+
     if (fstat(fileno(file), &st) < 0)
-        goto shm_out_fd;
+    {
+        fclose(file);
+        return -1;
+    }
 
     // get ttl
     fgets(buf, sizeof(buf), file);
 
     if (parse_ttl(buf, ttl) < 0)
-        goto shm_out_fd;
+    {
+        fclose(file);
+        return -1;
+    }
 
     // data still valid ?
     if (ttl) {
@@ -264,23 +204,33 @@ int read_data_metric(const char* filename, fty_proto_t* proto_metric)
     }
     fclose(file);
     return 0;
-
-shm_out_fd:
-    fclose(file);
-    return ret;
 }
 
 int fty_shm_read_metric(const char* asset, const char* metric, char** value, char** unit)
 {
     char filename[PATH_MAX];
+    fty_proto_t * proto_metric = fty_proto_new(FTY_PROTO_METRIC);
+    int result;
 
     if (prepare_filename(filename, asset, strlen(asset), metric, strlen(metric), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
-    if (!unit) {
-        char* dummy;
-        return read_value(filename, *value, dummy, false);
+    
+
+    result = read_data_metric(filename, proto_metric);
+
+    if(result == 0)
+    {
+        strncpy(*value, fty_proto_value(proto_metric), strlen(fty_proto_value(proto_metric)));
+
+        if (unit) {
+            strncpy(*unit, fty_proto_unit(proto_metric), strlen(fty_proto_unit(proto_metric)));
+        }  
     }
-    return read_value(filename, *value, *unit);
+    
+
+    fty_proto_destroy(&proto_metric);
+
+    return result;
 }
 
 int fty_shm_read_family(const char* family, std::string asset, std::string type, fty::shm::shmMetrics& result)
@@ -359,7 +309,8 @@ int fty_shm_delete_test_dir()
         FILE* file = nullptr;
         if (strstr(entry->d_name, "@") != nullptr) {
             char abs_path[2048] = {0};
-            sprintf(abs_path, "%s/%s", metric_dir.c_str(), entry->d_name);
+            size_t pathLen = metric_dir.size() + strlen(entry->d_name) + 2;
+            snprintf(abs_path, pathLen, "%s/%s", metric_dir.c_str(), entry->d_name);
             file = fopen(abs_path, "r");
             if (file != nullptr) {
                 fclose(file);
@@ -466,21 +417,30 @@ int fty::shm::write_metric(
 int fty::shm::read_metric_value(const std::string& asset, const std::string& metric, std::string& value)
 {
     char        filename[PATH_MAX];
-    std::string dummy;
+    fty_proto_t * proto_metric = fty_proto_new(FTY_PROTO_METRIC);
+    int result;
 
     if (prepare_filename(
             filename, asset.c_str(), asset.length(), metric.c_str(), metric.length(), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
-    return read_value(filename, value, dummy, false);
+
+    result = read_data_metric(filename, proto_metric);
+    
+    if(result == 0)
+        value = std::string(fty_proto_value(proto_metric));
+
+    fty_proto_destroy(&proto_metric);
+    
+    return result;
 }
 
 int fty::shm::read_metric(const std::string& asset, const std::string& metric, fty_proto_t** proto_metric)
 {
+    char filename[PATH_MAX];
+    
     if (proto_metric == nullptr) {
         return -1;
     }
-
-    char filename[PATH_MAX];
 
     if (prepare_filename(
             filename, asset.c_str(), asset.length(), metric.c_str(), metric.length(), FTY_SHM_METRIC_TYPE) < 0)
