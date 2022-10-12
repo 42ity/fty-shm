@@ -73,6 +73,7 @@ int fty_get_polling_interval()
 static const char* shm_dir     = DEFAULT_SHM_DIR;
 static size_t      shm_dir_len = strlen(DEFAULT_SHM_DIR);
 
+// returns 0 on uscces 
 static int prepare_filename(
     char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len, const char* type)
 {
@@ -104,6 +105,7 @@ static int prepare_filename(
     return 0;
 }
 
+// must be called with first fgets buffer after opening the file 
 static int parse_ttl(char* ttl_str, time_t& ttl)
 {
     char* err;
@@ -122,6 +124,8 @@ static int parse_ttl(char* ttl_str, time_t& ttl)
     return 0;
 }
 
+// returns 0 on succes and fails if file doesn't exist 
+// passes results to proto_metric
 int read_data_metric(const char* filename, fty_proto_t* proto_metric)
 {
     struct stat st;
@@ -293,6 +297,9 @@ int fty::shm::read_metrics(const std::string& asset, const std::string& type, sh
     return 0;
 }
 
+
+// should be called onl on unit test 
+// deletes the folder created with fty_shm_set_test_dir
 int fty_shm_delete_test_dir()
 {
     if (strcmp(shm_dir, DEFAULT_SHM_DIR) == 0)
@@ -309,8 +316,7 @@ int fty_shm_delete_test_dir()
         FILE* file = nullptr;
         if (strstr(entry->d_name, "@") != nullptr) {
             char abs_path[2048] = {0};
-            size_t pathLen = metric_dir.size() + strlen(entry->d_name) + 2;
-            snprintf(abs_path, pathLen, "%s/%s", metric_dir.c_str(), entry->d_name);
+            snprintf(abs_path, sizeof(abs_path), "%s/%s", metric_dir.c_str(), entry->d_name);
             file = fopen(abs_path, "r");
             if (file != nullptr) {
                 fclose(file);
@@ -324,6 +330,8 @@ int fty_shm_delete_test_dir()
     return remove(shm_dir);
 }
 
+// should be called onl on unit test 
+//  sets the current folder path to test directory 
 int fty_shm_set_test_dir(const char* dir)
 {
     int ret = 0;
