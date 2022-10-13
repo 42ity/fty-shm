@@ -24,10 +24,7 @@
 #include "fty_shm.h"
 #include <assert.h>
 #include <regex>
-
-#include "fty_shm.h"
 #include "publisher.h"
-
 #include <cstring>
 
 #define DEFAULT_SHM_DIR "/run/42shm"
@@ -393,7 +390,7 @@ static int write_metric_data(const char* filename, fty_proto_t* metric)
 int fty::shm::write_metric(fty_proto_t* metric)
 {
     char filename[PATH_MAX];
-
+    
     if (prepare_filename(filename, fty_proto_name(metric), strlen(fty_proto_name(metric)), fty_proto_type(metric),
             strlen(fty_proto_type(metric)), FTY_SHM_METRIC_TYPE) < 0)
         return -1;

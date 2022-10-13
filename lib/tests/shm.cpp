@@ -12,6 +12,23 @@ TEST_CASE("read-write test")
 
     REQUIRE(fty_shm_set_test_dir(SELFTEST_RW) == 0);
 
+    char longAssetName[PATH_MAX];
+
+    for(auto& i : longAssetName)
+    {
+        i = 's';
+    }
+
+    longAssetName[PATH_MAX - 1] = '\0';
+
+    REQUIRE(fty::shm::write_metric(longAssetName, "metric", "here_is_my_value", "unit?", 2) < 0);
+
+    const char * invalidAssetName1 = "te/st";
+    const char * invalidAssetName2 = "te@st";
+
+    REQUIRE(fty::shm::write_metric(invalidAssetName1, "metric", "here_is_my_value", "unit?", 2) < 0);
+    REQUIRE(fty::shm::write_metric(invalidAssetName2, "metric", "here_is_my_value", "unit?", 2) < 0);
+
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
     
     REQUIRE(fty::shm::read_metric_value("asset", "metric", value) == 0);
@@ -112,6 +129,12 @@ TEST_CASE("update test")
 
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_real_value", "unit?", 2) == 0);
+
+    const char * nonExistingAsset = "test asset name";
+
+    REQUIRE(fty::shm::read_metric_value(nonExistingAsset, "metric", value) < 0);
+    CHECK(value == "");
+
     REQUIRE(fty::shm::read_metric_value("asset", "metric", value) == 0);
     CHECK(value == "here_is_my_real_value");
     // Wait the end of the data
@@ -267,10 +290,51 @@ TEST_CASE("autoclean test")
 }
 
 TEST_CASE("poll interval test")
-{
+{   
+    // get current interval
+    int temp = fty_get_polling_interval();
+
     fty_shm_set_default_polling_interval(30);
     REQUIRE(fty_get_polling_interval() == 30);
     
     fty_shm_set_default_polling_interval(35);
     REQUIRE(fty_get_polling_interval() == 35);
+
+    // set the interval before tests
+    fty_shm_set_default_polling_interval(temp);
+}
+
+TEST_CASE("shmMetrics iterators test")
+{
+    fty_proto_t * proto1 = fty_proto_new(FTY_PROTO_METRIC);
+    fty_proto_t * proto2 = fty_proto_new(FTY_PROTO_METRIC);
+    std::unique_ptr<fty::shm::shmMetrics> m = std::make_unique<fty::shm::shmMetrics>();
+
+    fty_proto_set_name(proto1, "%s", "name1");
+    fty_proto_set_value(proto1, "%s", "value1");
+
+    fty_proto_set_name(proto2, "%s", "name2");
+    fty_proto_set_value(proto2, "%s", "value2");
+
+    m->add(proto1);
+    m->add(proto2);
+
+    CHECK(m->size() == 2);
+
+    CHECK(streq(fty_proto_name(m->get(0)), "name1"));
+    CHECK(streq(fty_proto_value(m->get(0)), "value1"));
+    fty_proto_set_name(m->get(0), "%s", "name1 test");
+    CHECK(streq(fty_proto_name(m->get(0)), "name1 test"));
+
+    CHECK(streq(fty_proto_name(m->get(1)), "name2"));
+    CHECK(streq(fty_proto_value(m->get(1)), "value2"));
+
+    fty::shm::shmMetrics::iterator itBegin = m->begin();
+
+    CHECK(streq(fty_proto_name(*itBegin), fty_proto_name(proto1)));
+    CHECK(streq(fty_proto_value(*itBegin), fty_proto_value(proto1)));
+    
+    fty::shm::shmMetrics::const_iterator itCBegin = m->cbegin();
+    CHECK(streq(fty_proto_name(*itCBegin), fty_proto_name(proto1)));
+    CHECK(streq(fty_proto_value(*itCBegin), fty_proto_value(proto1)));
 }
