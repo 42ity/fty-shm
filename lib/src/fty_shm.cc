@@ -70,7 +70,7 @@ int fty_get_polling_interval()
 static const char* shm_dir     = DEFAULT_SHM_DIR;
 static size_t      shm_dir_len = strlen(DEFAULT_SHM_DIR);
 
-// returns 0 on uscces 
+// creates file name 
 static int prepare_filename(
     char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len, const char* type)
 {
@@ -83,21 +83,8 @@ static int prepare_filename(
         errno = EINVAL;
         return -1;
     }
-    char* p = buf;
-    memcpy(p, shm_dir, shm_dir_len);
-    p += shm_dir_len;
 
-    *p++ = '/';
-    memcpy(p, type, strlen(type));
-    p += strlen(type);
-
-    *p++ = '/';
-    memcpy(p, metric, m_len);
-    p += m_len;
-    *p++ = SEPARATOR;
-    memcpy(p, asset, a_len);
-    p += a_len;
-    *p++ = '\0';
+    snprintf(buf, PATH_MAX, "%s/%s/%s@%s",shm_dir, type, metric, asset);
 
     return 0;
 }
@@ -327,8 +314,6 @@ int fty_shm_delete_test_dir()
     return remove(shm_dir);
 }
 
-// should be called onl on unit test 
-//  sets the current folder path to test directory 
 int fty_shm_set_test_dir(const char* dir)
 {
     int ret = 0;
@@ -390,10 +375,14 @@ static int write_metric_data(const char* filename, fty_proto_t* metric)
 int fty::shm::write_metric(fty_proto_t* metric)
 {
     char filename[PATH_MAX];
+
+    if(metric == nullptr)
+        return -1;
     
     if (prepare_filename(filename, fty_proto_name(metric), strlen(fty_proto_name(metric)), fty_proto_type(metric),
             strlen(fty_proto_type(metric)), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
+
     return write_metric_data(filename, metric);
 }
 
@@ -402,6 +391,9 @@ int fty::shm::write_metric(
 {
     int result;
     fty_proto_t * prt = fty_proto_new(FTY_PROTO_METRIC);
+
+    if( asset.empty() || metric.empty() || value.empty() || unit.empty() )
+        return -1;
 
     fty_proto_set_name(prt, "%s", asset.c_str());
     fty_proto_set_type(prt, "%s", metric.c_str());
@@ -487,6 +479,6 @@ long unsigned int fty::shm::shmMetrics::size()
 }
 
 void fty::shm::shmMetrics::add(fty_proto_t* metric)
-{
+{   
     m_metricsVector.push_back(metric);
 }

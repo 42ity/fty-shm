@@ -30,7 +30,10 @@ extern "C" {
 #define FTY_SHM_METRIC_TYPE "0"
 
 // currently here until it can be merge in a fty_common* lib
+// @return : current polling interval
 int  fty_get_polling_interval();
+
+// @param val : value to set polling interval
 void fty_shm_set_default_polling_interval(int val);
 
 // This is the basic C API of the library. It allows to store and retrieve
@@ -38,12 +41,22 @@ void fty_shm_set_default_polling_interval(int val);
 
 // Retrieve a metric from shm. Caller must free the returned values.
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
+// @param asset : asset name 
+// @param metric : metric name
+// @param value : parameter to be write the value output
+// @param unit : parameter to be write the unit output
+// @return : 1 on succes, -1 if asset doesn't exist  
 int fty_shm_read_metric(const char* asset, const char* metric, char** value, char** unit);
 
 // Use a custom storage directory for test purposes (the passed string must
 // not be freed)
+// should be called only on unit test 
+// sets the current folder path to test directory 
+// returns 0 on succes 
+// returns -1 if input string size is longer than max allowed(PATH_MAX - strlen("/") - NAME_MAX)
 int fty_shm_set_test_dir(const char* dir);
 // Clean the custom storage directory
+// @return : 0 on succes, for non-zero error codes listed in rmdir() document 
 int fty_shm_delete_test_dir();
 
 #ifdef __cplusplus
@@ -66,9 +79,21 @@ public:
     // If you use this, DO NOT DELETE the fty_proto_t. It will be take
     // care by the shmlMetrics's destructor.
     //  (same warning if you access to it using iterator)
+
+    // @param index : index of the m_metricsVector
+    // @return : the address of the indexed element
     fty_proto_t*      get(int index);
+
+    // duplicates the index element
+    // @param index : index of the m_metricsVector
+    // @return : duplicated element
     fty_proto_t*      getDup(int index);
+
+    // pushes back the input fty_proto_t pointer
+    // @param metric : member will be pushed back to the vector
     void              add(fty_proto_t* metric);
+
+    // returns size of the vector
     long unsigned int size();
 
     typedef typename std::vector<fty_proto_t*>   vector_type;
@@ -97,7 +122,11 @@ private:
 };
 
 // C++ versions of fty_shm_write_metric_proto()
+// @param metric : metric data will be written to file
+// @return : 0 on succes, -1 if file cannot be created
 int write_metric(fty_proto_t* metric);
+
+// @params : file name constructed as (shm_dir)/(type)/(metric)@(asset)
 int write_metric(
     const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
 
