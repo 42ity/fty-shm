@@ -39,6 +39,15 @@ void fty_shm_set_default_polling_interval(int val);
 // This is the basic C API of the library. It allows to store and retrieve
 // individual metrics.
 
+// Stores a single metric in shm. The metric name must be a valid filename
+// (must not contain slashes and must fit within the OS limit for filename
+// length). TTL is the number of seconds for which this metric is valid,
+// where 0 means infinity
+// Returns 0 on success. On error, returns -1 and sets errno accordingly
+int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl);
+
+int fty_shm_write_metric_proto(fty_proto_t* metric);
+
 // Retrieve a metric from shm. Caller must free the returned values.
 // Returns 0 on success. On error, returns -1 and sets errno accordingly
 // @param asset : asset name 
@@ -127,10 +136,16 @@ private:
 int write_metric(fty_proto_t* metric);
 
 // @params : file name constructed as (shm_dir)/(type)/(metric)@(asset)
+// @return : 0 on succes, -1 if file name is incompatible
 int write_metric(
     const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
 
 // C++ version of fty_shm_read_metric()
+// reads the file according to asset name and type and returns the value 
+// @param asset : asset name
+// @param metric : fty_proto_t type
+// @param value : output value
+// @return : 0 on succes, -1 if file doesn't exist or cannot be opened
 int read_metric_value(const std::string& asset, const std::string& metric, std::string& value);
 
 // if return = 0 : create a fty_proto which correspond to the metric. Must be

@@ -72,21 +72,54 @@ static size_t      shm_dir_len = strlen(DEFAULT_SHM_DIR);
 
 // creates file name 
 static int prepare_filename(
-    char* buf, const char* asset, size_t a_len, const char* metric, size_t m_len, const char* type)
+    char* buf, size_t bufSize, const char* asset, const char* metric, const char* type)
 {
-    if (m_len + SEPARATOR_LEN + a_len > NAME_MAX) {
+
+    size_t assetLen = strlen(asset);
+    size_t metricLen = strlen(metric);
+    if (metricLen + SEPARATOR_LEN + assetLen > NAME_MAX) {
         errno = ENAMETOOLONG;
         return -1;
     }
-    if (memchr(asset, '/', a_len) || memchr(asset, SEPARATOR, a_len) || memchr(metric, '/', m_len) ||
-        memchr(metric, SEPARATOR, m_len)) {
+
+    if( (!asset || !(*asset)) || (!metric || !(*metric)) || (!type || !(*type)) )
+        return -1;
+
+    if (memchr(asset, '/', assetLen) || memchr(asset, SEPARATOR, assetLen) || memchr(metric, '/', metricLen) ||
+        memchr(metric, SEPARATOR, metricLen)) {
         errno = EINVAL;
         return -1;
     }
 
-    snprintf(buf, PATH_MAX, "%s/%s/%s@%s",shm_dir, type, metric, asset);
-
+    if(snprintf(buf, bufSize, "%s/%s/%s@%s",shm_dir, type, metric, asset) < 0)
+        return -1;
+    
     return 0;
+}
+
+int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl)
+{
+    fty_proto_t * prt = fty_proto_new(FTY_PROTO_METRIC);
+    bool result;
+
+    if( (!asset && !(*asset)) )
+
+    fty_proto_set_name(prt, "%s", asset);
+    fty_proto_set_type(prt, "%s", metric);
+    fty_proto_set_unit(prt, "%s", unit);
+    fty_proto_set_value(prt, "%s", value);
+
+    if(ttl < 0)
+        ttl = 0;
+
+    fty_proto_set_ttl(prt, static_cast<uint32_t>(ttl));
+
+
+    result = fty_shm_write_metric_proto(prt);
+
+    fty_proto_destroy(&prt);
+
+    return result;
 }
 
 // must be called with first fgets buffer after opening the file 
@@ -200,7 +233,7 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
     fty_proto_t * proto_metric = fty_proto_new(FTY_PROTO_METRIC);
     int result;
 
-    if (prepare_filename(filename, asset, strlen(asset), metric, strlen(metric), FTY_SHM_METRIC_TYPE) < 0)
+    if (prepare_filename(filename, sizeof filename, asset, metric, FTY_SHM_METRIC_TYPE) < 0)
         return -1;
     
 
@@ -372,6 +405,16 @@ static int write_metric_data(const char* filename, fty_proto_t* metric)
     return 0;
 }
 
+int fty_shm_write_metric_proto(fty_proto_t* metric)
+{
+    char filename[PATH_MAX];
+
+    if (prepare_filename(filename, sizeof filename, fty_proto_name(metric), fty_proto_type(metric), FTY_SHM_METRIC_TYPE) < 0)
+        return -1;
+
+    return write_metric_data(filename, metric);
+}
+
 int fty::shm::write_metric(fty_proto_t* metric)
 {
     char filename[PATH_MAX];
@@ -379,8 +422,7 @@ int fty::shm::write_metric(fty_proto_t* metric)
     if(metric == nullptr)
         return -1;
     
-    if (prepare_filename(filename, fty_proto_name(metric), strlen(fty_proto_name(metric)), fty_proto_type(metric),
-            strlen(fty_proto_type(metric)), FTY_SHM_METRIC_TYPE) < 0)
+    if (prepare_filename(filename, sizeof filename, fty_proto_name(metric), fty_proto_type(metric), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
 
     return write_metric_data(filename, metric);
@@ -418,7 +460,7 @@ int fty::shm::read_metric_value(const std::string& asset, const std::string& met
     int result;
 
     if (prepare_filename(
-            filename, asset.c_str(), asset.length(), metric.c_str(), metric.length(), FTY_SHM_METRIC_TYPE) < 0)
+            filename, sizeof filename, asset.c_str(), metric.c_str(), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
 
     result = read_data_metric(filename, proto_metric);
@@ -440,7 +482,7 @@ int fty::shm::read_metric(const std::string& asset, const std::string& metric, f
     }
 
     if (prepare_filename(
-            filename, asset.c_str(), asset.length(), metric.c_str(), metric.length(), FTY_SHM_METRIC_TYPE) < 0)
+            filename, sizeof filename, asset.c_str(), metric.c_str(), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
 
     *proto_metric = fty_proto_new(FTY_PROTO_METRIC);
