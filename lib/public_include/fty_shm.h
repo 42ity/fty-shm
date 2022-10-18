@@ -70,10 +70,6 @@ int fty_shm_delete_test_dir();
 
 #ifdef __cplusplus
 }
-// More fancy stuff is possible with the C++ API. It is arguably not the
-// cleanest API on the planet -- it signals errors via a return code and
-// requires the caller to provide a container for the results instead of
-// relying on RVO -- but it should be good enough for now.
 
 #include <string>
 #include <unordered_map>
@@ -90,7 +86,7 @@ public:
     //  (same warning if you access to it using iterator)
 
     // @param index : index of the m_metricsVector
-    // @return : the address of the indexed element
+    // @return : the object of the indexed element
     fty_proto_t*      get(int index);
 
     // duplicates the index element
@@ -135,17 +131,21 @@ private:
 // @return : 0 on succes, -1 if file cannot be created
 int write_metric(fty_proto_t* metric);
 
-// @params : file name constructed as (shm_dir)/(type)/(metric)@(asset)
+// @param asset : asset name
+// @param metric : metric name
+// @param value : metric value
+// @param unit : metric unit
+// @param ttl : data sotrage duration 
 // @return : 0 on succes, -1 if file name is incompatible
 int write_metric(
     const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
 
 // C++ version of fty_shm_read_metric()
-// reads the file according to asset name and type and returns the value 
+// reads the metric according to asset name and type and returns the value 
 // @param asset : asset name
-// @param metric : fty_proto_t type
+// @param metric : metric type
 // @param value : output value
-// @return : 0 on succes, -1 if file doesn't exist or cannot be opened
+// @return : 0 on succes, -1 if metric doesn't exist or cannot be opened
 int read_metric_value(const std::string& asset, const std::string& metric, std::string& value);
 
 // if return = 0 : create a fty_proto which correspond to the metric. Must be

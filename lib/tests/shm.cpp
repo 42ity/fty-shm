@@ -36,7 +36,7 @@ TEST_CASE("read-write test")
 
     // pass invalid parameters to write_metric(returns fail)
     REQUIRE(fty::shm::write_metric("", "", "", "", -1) < 0);
-    REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "", -1) < 0);
+    REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "", -1) == 0);
     REQUIRE(fty::shm::write_metric(invalidAssetName2, "metric", "", "unit?", -1) < 0);
     REQUIRE(fty::shm::write_metric(invalidAssetName2, "", "here_is_my_value", "unit?", -1) < 0);
     

@@ -54,7 +54,7 @@ void fty_shm_set_default_polling_interval(int val)
 
 int fty_get_polling_interval()
 {
-    static int val  = 30;
+    int val  = 30;
     char*      data = getenv(POLL_ENV);
     if (data && strtol(data, nullptr, 10) > 0)
         return int(strtol(data, nullptr, 10));
@@ -74,16 +74,16 @@ static size_t      shm_dir_len = strlen(DEFAULT_SHM_DIR);
 static int prepare_filename(
     char* buf, size_t bufSize, const char* asset, const char* metric, const char* type)
 {
+    if( (!asset || !(*asset)) || (!metric || !(*metric)) || (!type || !(*type)) )
+        return -1;
 
     size_t assetLen = strlen(asset);
     size_t metricLen = strlen(metric);
+
     if (metricLen + SEPARATOR_LEN + assetLen > NAME_MAX) {
         errno = ENAMETOOLONG;
         return -1;
     }
-
-    if( (!asset || !(*asset)) || (!metric || !(*metric)) || (!type || !(*type)) )
-        return -1;
 
     if (memchr(asset, '/', assetLen) || memchr(asset, SEPARATOR, assetLen) || memchr(metric, '/', metricLen) ||
         memchr(metric, SEPARATOR, metricLen)) {
@@ -99,30 +99,34 @@ static int prepare_filename(
 
 int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl)
 {
-    fty_proto_t * prt = fty_proto_new(FTY_PROTO_METRIC);
-    bool result;
+    fty_proto_t * proto_metric = fty_proto_new(FTY_PROTO_METRIC);
+    int result;
 
-    if( (!asset && !(*asset)) )
+    if(!proto_metric)
+        return -1;
 
-    fty_proto_set_name(prt, "%s", asset);
-    fty_proto_set_type(prt, "%s", metric);
-    fty_proto_set_unit(prt, "%s", unit);
-    fty_proto_set_value(prt, "%s", value);
+    fty_proto_set_name(proto_metric, "%s", asset);
+    fty_proto_set_type(proto_metric, "%s", metric);
+    fty_proto_set_unit(proto_metric, "%s", unit);
+    fty_proto_set_value(proto_metric, "%s", value);
 
     if(ttl < 0)
         ttl = 0;
 
-    fty_proto_set_ttl(prt, static_cast<uint32_t>(ttl));
+    fty_proto_set_ttl(proto_metric, static_cast<uint32_t>(ttl));
 
 
-    result = fty_shm_write_metric_proto(prt);
+    result = fty_shm_write_metric_proto(proto_metric);
 
-    fty_proto_destroy(&prt);
+    fty_proto_destroy(&proto_metric);
 
     return result;
 }
 
-// must be called with first fgets buffer after opening the file 
+// parses ttl from metric
+// @param ttl_str : ttl line of the metric
+// @param ttl : result reference
+// @return : 0 on succes, -1 if the size is not appropriate
 static int parse_ttl(char* ttl_str, time_t& ttl)
 {
     char* err;
@@ -409,7 +413,7 @@ int fty_shm_write_metric_proto(fty_proto_t* metric)
 {
     char filename[PATH_MAX];
 
-    if (prepare_filename(filename, sizeof filename, fty_proto_name(metric), fty_proto_type(metric), FTY_SHM_METRIC_TYPE) < 0)
+    if (prepare_filename(filename, sizeof(filename), fty_proto_name(metric), fty_proto_type(metric), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
 
     return write_metric_data(filename, metric);
@@ -422,7 +426,7 @@ int fty::shm::write_metric(fty_proto_t* metric)
     if(metric == nullptr)
         return -1;
     
-    if (prepare_filename(filename, sizeof filename, fty_proto_name(metric), fty_proto_type(metric), FTY_SHM_METRIC_TYPE) < 0)
+    if (prepare_filename(filename, sizeof(filename), fty_proto_name(metric), fty_proto_type(metric), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
 
     return write_metric_data(filename, metric);
@@ -432,23 +436,23 @@ int fty::shm::write_metric(
     const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl)
 {
     int result;
-    fty_proto_t * prt = fty_proto_new(FTY_PROTO_METRIC);
+    fty_proto_t * proto_metric = fty_proto_new(FTY_PROTO_METRIC);
 
-    if( asset.empty() || metric.empty() || value.empty() || unit.empty() )
+    if( asset.empty() || metric.empty() || value.empty() )
         return -1;
 
-    fty_proto_set_name(prt, "%s", asset.c_str());
-    fty_proto_set_type(prt, "%s", metric.c_str());
-    fty_proto_set_value(prt, "%s", value.c_str());
-    fty_proto_set_unit(prt, "%s", unit.c_str());
+    fty_proto_set_name(proto_metric, "%s", asset.c_str());
+    fty_proto_set_type(proto_metric, "%s", metric.c_str());
+    fty_proto_set_value(proto_metric, "%s", value.c_str());
+    fty_proto_set_unit(proto_metric, "%s", unit.c_str());
     
     if(ttl < 0)
         ttl = 0;
 
-    fty_proto_set_ttl(prt, static_cast<uint32_t>(ttl));
+    fty_proto_set_ttl(proto_metric, static_cast<uint32_t>(ttl));
 
-    result = fty::shm::write_metric(prt);
-    fty_proto_destroy(&prt);
+    result = fty::shm::write_metric(proto_metric);
+    fty_proto_destroy(&proto_metric);
 
     return result;
 }
@@ -460,7 +464,7 @@ int fty::shm::read_metric_value(const std::string& asset, const std::string& met
     int result;
 
     if (prepare_filename(
-            filename, sizeof filename, asset.c_str(), metric.c_str(), FTY_SHM_METRIC_TYPE) < 0)
+            filename, sizeof(filename), asset.c_str(), metric.c_str(), FTY_SHM_METRIC_TYPE) < 0)
         return -1;
 
     result = read_data_metric(filename, proto_metric);
