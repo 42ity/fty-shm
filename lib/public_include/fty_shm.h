@@ -81,21 +81,24 @@ class shmMetrics
 {
 public:
     ~shmMetrics();
-    // If you use this, DO NOT DELETE the fty_proto_t. It will be take
-    // care by the shmlMetrics's destructor.
-    //  (same warning if you access to it using iterator)
 
     // @param index : index of the m_metricsVector
     // @return : the object of the indexed element
+    //           caller must not delete the returned object
+    //           deallocation handled in shmMetrics dtor
     fty_proto_t*      get(int index);
 
     // duplicates the index element
     // @param index : index of the m_metricsVector
-    // @return : duplicated element
+    // @return : duplicated element, caller must
+    //           delete the returned object
     fty_proto_t*      getDup(int index);
 
     // pushes back the input fty_proto_t pointer
     // @param metric : member will be pushed back to the vector
+    //                 objects added to the vector will be
+    //                 deleted by the shmMetrics dtor, caller
+    //                 must leave witohut destroy
     void              add(fty_proto_t* metric);
 
     // returns size of the vector

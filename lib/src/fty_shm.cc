@@ -257,10 +257,9 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
 
         if (unit) {
             strncpy(*unit, fty_proto_unit(proto_metric), strlen(fty_proto_unit(proto_metric)));
-        } 
+        }
     }
     
-
     fty_proto_destroy(&proto_metric);
 
     return result;
@@ -410,8 +409,11 @@ static int write_metric_data(const char* filename, fty_proto_t* metric)
             item = static_cast<char*>(zhash_next(aux));
         }
     }
+
     if (fclose(file) < 0)
+    {
         return -1;
+    }
 
     Publisher::publishMetric(metric); //mqtt-pub
     return 0;

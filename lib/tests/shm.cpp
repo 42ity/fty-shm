@@ -96,6 +96,7 @@ TEST_CASE("read-write test")
 
     fty_shm_delete_test_dir();
     fty_proto_destroy(&proto_metric);
+    fty_proto_destroy(&proto_neg);
 }
 
 TEST_CASE("write-read with aux test")
