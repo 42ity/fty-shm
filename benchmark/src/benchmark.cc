@@ -122,7 +122,6 @@ void Benchmark::timestamp(const std::string& message)
 
 void Benchmark::c_api_bench()
 {
-    printf("c_api_bench call \n");
     int    i;
     std::ostringstream Onames;
     std::ostringstream Ovalues;
@@ -163,7 +162,7 @@ void Benchmark::c_api_bench()
                 fty_shm_read_metric("bench_asset", name.c_str(), &res_value, &res_unit);
             }
         }
-        
+
         timestamp("reads");
 
         delete res_value;
