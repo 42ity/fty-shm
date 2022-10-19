@@ -92,7 +92,9 @@ static int prepare_filename(
     }
 
     if(snprintf(buf, bufSize, "%s/%s/%s@%s",shm_dir, type, metric, asset) < 0)
+    {
         return -1;
+    }
     
     return 0;
 }
@@ -103,7 +105,9 @@ int fty_shm_write_metric(const char* asset, const char* metric, const char* valu
     int result;
 
     if(!proto_metric)
+    {
         return -1;
+    }
 
     fty_proto_set_name(proto_metric, "%s", asset);
     fty_proto_set_type(proto_metric, "%s", metric);
@@ -184,7 +188,10 @@ int read_data_metric(const char* filename, fty_proto_t* proto_metric)
             fclose(file);
             char* valenv = getenv(AUTOCLEAN_ENV);
             if (!valenv || strcmp(valenv, "OFF") != 0)
+            {
                 remove(filename);
+            }
+
             return -1;
         }
     }
@@ -238,8 +245,9 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
     int result;
 
     if (prepare_filename(filename, sizeof filename, asset, metric, FTY_SHM_METRIC_TYPE) < 0)
+    {
         return -1;
-    
+    }
 
     result = read_data_metric(filename, proto_metric);
 
@@ -249,7 +257,7 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
 
         if (unit) {
             strncpy(*unit, fty_proto_unit(proto_metric), strlen(fty_proto_unit(proto_metric)));
-        }  
+        } 
     }
     
 
@@ -447,7 +455,9 @@ int fty::shm::write_metric(
     fty_proto_set_unit(proto_metric, "%s", unit.c_str());
     
     if(ttl < 0)
+    {
         ttl = 0;
+    }
 
     fty_proto_set_ttl(proto_metric, static_cast<uint32_t>(ttl));
 
@@ -470,7 +480,9 @@ int fty::shm::read_metric_value(const std::string& asset, const std::string& met
     result = read_data_metric(filename, proto_metric);
     
     if(result == 0)
+    {
         value = std::string(fty_proto_value(proto_metric));
+    }
 
     fty_proto_destroy(&proto_metric);
     
@@ -485,9 +497,10 @@ int fty::shm::read_metric(const std::string& asset, const std::string& metric, f
         return -1;
     }
 
-    if (prepare_filename(
-            filename, sizeof filename, asset.c_str(), metric.c_str(), FTY_SHM_METRIC_TYPE) < 0)
+    if(prepare_filename(filename, sizeof filename, asset.c_str(), metric.c_str(), FTY_SHM_METRIC_TYPE) < 0)
+    {
         return -1;
+    }
 
     *proto_metric = fty_proto_new(FTY_PROTO_METRIC);
     fty_proto_set_name(*proto_metric, "%s", asset.c_str());

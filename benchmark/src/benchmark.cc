@@ -122,42 +122,53 @@ void Benchmark::timestamp(const std::string& message)
 
 void Benchmark::c_api_bench()
 {
+    printf("c_api_bench call \n");
     int    i;
-    char*  names      = new char[NUM_METRICS * METRIC_LEN];
-    char*  values     = new char[NUM_METRICS * VALUE_LEN];
-    char** res_values = new char*[NUM_METRICS * sizeof(char*)];
-    char** res_units  = new char*[NUM_METRICS * sizeof(char*)];
+    std::ostringstream Onames;
+    std::ostringstream Ovalues;
+
     for (i = 0; i < NUM_METRICS; i++) {
-        sprintf(names + i * METRIC_LEN, METRIC_FMT, i);
-        sprintf(values + i * VALUE_LEN, VALUE_FMT, i);
-    }
-    timestamp("setup");
-    if (do_write) {
-        for (i = 0; i < NUM_METRICS; i++)
-        {
-            fty::shm::write_metric("bench_asset", 
-                                    std::string(names + i * METRIC_LEN), 
-                                    std::string(values + i * METRIC_LEN), 
-                                    "unit",
-                                    300);
-        }
-            
-        timestamp("writes");
-    }
-    if (do_read) {
-        for (i = 0; i < NUM_METRICS; i++)
-            fty_shm_read_metric("bench_asset", names + i * METRIC_LEN, &res_values[i], &res_units[i]);
-        timestamp("reads");
+        Onames << "m" << std::setw(8) << std::setfill('0') << std::right << std::to_string(i) << " ";;
+        Ovalues << "v" << std::setw(8) << std::setfill('0') << std::right << std::to_string(i) << " ";
     }
 
-    delete[](names);
-    delete[](values);
-    for (i = 0; i < NUM_METRICS; i++) {
-        free(res_values[i]);
-        free(res_units[i]);
+    timestamp("setup");
+
+    if (do_write) {
+        std::istringstream Inames(Onames.str());
+        std::istringstream Ivalues(Ovalues.str());
+        std::string name;
+        std::string val;
+
+        for (i = 0; i < NUM_METRICS; i++)
+        {
+            if(getline(Inames, name, ' ') && getline(Ivalues, val, ' '))
+            {
+                fty_shm_write_metric("bench_asset", name.c_str(), val.c_str(), "unit", 300);
+            }
+        }
+        timestamp("writes");
     }
-    delete[](res_values);
-    delete[](res_units);
+
+    if (do_read) {
+        std::istringstream Inames(Onames.str());
+        std::string name;
+        char * res_value = new char[VALUE_LEN];
+        char * res_unit = new char[5];
+
+        for (i = 0; i < NUM_METRICS; i++)
+        {
+            if(getline(Inames, name, ' '))
+            {
+                fty_shm_read_metric("bench_asset", name.c_str(), &res_value, &res_unit);
+            }
+        }
+        
+        timestamp("reads");
+
+        delete res_value;
+        delete res_unit;
+    }
 }
 
 void Benchmark::cpp_api_bench()
@@ -170,11 +181,12 @@ void Benchmark::cpp_api_bench()
     values.reserve(NUM_METRICS);
     for (i = 0; i < NUM_METRICS; i++) {
         char buf[METRIC_LEN];
-        sprintf(buf, METRIC_FMT, i);
+        snprintf(buf, sizeof(buf), METRIC_FMT, i);
         names.push_back(buf);
-        sprintf(buf, VALUE_FMT, i);
+        snprintf(buf, sizeof(buf), VALUE_FMT, i);
         values.push_back(buf);
     }
+    while(1);
     timestamp("setup");
     if (do_write) {
         for (i = 0; i < NUM_METRICS; i++)
