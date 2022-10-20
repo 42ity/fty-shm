@@ -152,21 +152,20 @@ void Benchmark::c_api_bench()
     if (do_read) {
         std::istringstream Inames(Onames.str());
         std::string name;
-        char * res_value = new char[VALUE_LEN];
-        char * res_unit = new char[5];
 
         for (i = 0; i < NUM_METRICS; i++)
         {
             if(getline(Inames, name, ' '))
             {
+                char* res_value;
+                char* res_unit;
                 fty_shm_read_metric("bench_asset", name.c_str(), &res_value, &res_unit);
+                zstr_free(&res_value);
+                zstr_free(&res_unit);
             }
         }
 
         timestamp("reads");
-
-        delete res_value;
-        delete res_unit;
     }
 }
 

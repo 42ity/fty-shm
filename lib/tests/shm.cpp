@@ -10,18 +10,23 @@ TEST_CASE("read-write test")
     std::string  value;
     fty_proto_t *proto_metric = nullptr;
 
+
+printf("XXXX\n");
+
     // adjust test directory
     REQUIRE(fty_shm_set_test_dir(SELFTEST_RW) == 0);
 
     char longAssetName[PATH_MAX];
 
-    // create an asset name longer than max allowed 
+    // create an asset name longer than max allowed
     for(auto& i : longAssetName)
     {
         i = 's';
     }
 
     longAssetName[PATH_MAX - 1] = '\0';
+
+printf("AAA\n");
 
     // write_metric returns fail
     REQUIRE(fty::shm::write_metric(longAssetName, "metric", "here_is_my_value", "unit?", 2) < 0);
@@ -30,18 +35,34 @@ TEST_CASE("read-write test")
     const char * invalidAssetName1 = "te/st";
     const char * invalidAssetName2 = "te@st";
 
+
+printf("999999\n");
+
     // write_metric returns fail
     REQUIRE(fty::shm::write_metric(invalidAssetName1, "metric", "here_is_my_value", "unit?", 2) < 0);
     REQUIRE(fty::shm::write_metric(invalidAssetName2, "metric", "here_is_my_value", "unit?", 2) < 0);
 
+
+printf("8888\n");
+
     // pass invalid parameters to write_metric(returns fail)
     REQUIRE(fty::shm::write_metric("", "", "", "", -1) < 0);
-    REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "", -1) == 0);
-    REQUIRE(fty::shm::write_metric(invalidAssetName2, "metric", "", "unit?", -1) < 0);
-    REQUIRE(fty::shm::write_metric(invalidAssetName2, "", "here_is_my_value", "unit?", -1) < 0);
-    
+
+printf("xx\n");
+    REQUIRE(fty::shm::write_metric("asset", "metric", "", "unit?", -1) < 0);
+
+printf("yy\n");
+    REQUIRE(fty::shm::write_metric("asset", "", "here_is_my_value", "unit?", -1) < 0);
+
+printf("zz\n");
+    REQUIRE(fty::shm::write_metric("", "metric", "here_is_my_value", "unit?", -1) < 0);
+
+
+printf("ttt\n");
     // pass null to write_metric(returns fail)
     REQUIRE(fty::shm::write_metric(nullptr) < 0);
+
+printf("BBB\n");
 
     // pass negative ttl value to write_metric
     // neg. values accepted as zero
@@ -54,8 +75,11 @@ TEST_CASE("read-write test")
     REQUIRE(fty::shm::write_metric(proto_neg) == 0);
 
     // write metrics with ordinary allowed parameters
+    REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "", 2) == 0);
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
-    
+
+printf("CCCC\n");
+
     // read values with the same parameters
     // succesful and equals to written values
     REQUIRE(fty::shm::read_metric_value("asset", "metric", value) == 0);
@@ -117,10 +141,10 @@ TEST_CASE("write-read with aux test")
     fty_proto_set_unit(proto_metric, "%s", "unit?");
     fty_proto_aux_insert(proto_metric, "myfirstaux", "%s", "value_first_aux");
     fty_proto_aux_insert(proto_metric, "mysecondaux", "%s", "value_second_aux");
-    
+
     // write proto_metric
     REQUIRE(fty::shm::write_metric(proto_metric) == 0);
-    
+
     //read back
     REQUIRE(fty::shm::read_metric("asset", "metric", &proto_metric_result) == 0);
     REQUIRE(proto_metric_result);
@@ -165,7 +189,7 @@ TEST_CASE("update test")
     std::string value;
 
     REQUIRE(fty_shm_set_test_dir(SELFTEST_RW) == 0);
-    
+
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_real_value", "unit?", 2) == 0);
 
@@ -332,16 +356,20 @@ TEST_CASE("autoclean test")
 }
 
 TEST_CASE("poll interval test")
-{   
+{
     // get current interval
     int temp = fty_get_polling_interval();
 
     // set interval to 4, getter returns the same
     fty_shm_set_default_polling_interval(4);
     REQUIRE(fty_get_polling_interval() == 4);
-    
+
     // set interval to 20, getter returns the same
     fty_shm_set_default_polling_interval(20);
+    REQUIRE(fty_get_polling_interval() == 20);
+
+    // set interval to -1, rejected & unchanged
+    fty_shm_set_default_polling_interval(-1);
     REQUIRE(fty_get_polling_interval() == 20);
 
     // set the interval before tests
@@ -383,7 +411,7 @@ TEST_CASE("shmMetrics iterators test")
     fty::shm::shmMetrics::iterator itBegin = m->begin();
     CHECK(streq(fty_proto_name(*itBegin), fty_proto_name(proto1)));
     CHECK(streq(fty_proto_value(*itBegin), fty_proto_value(proto1)));
-    
+
     // constant begin returns the address first element(proto1)
     fty::shm::shmMetrics::const_iterator itCBegin = m->cbegin();
     CHECK(streq(fty_proto_name(*itCBegin), fty_proto_name(proto1)));

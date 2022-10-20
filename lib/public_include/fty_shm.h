@@ -22,58 +22,58 @@
 #pragma once
 
 #include <fty_proto.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define FTY_SHM_METRIC_TYPE "0"
-
-// currently here until it can be merge in a fty_common* lib
-// @return : current polling interval
-int  fty_get_polling_interval();
-
-// @param val : value to set polling interval
-void fty_shm_set_default_polling_interval(int val);
-
-// This is the basic C API of the library. It allows to store and retrieve
-// individual metrics.
-
-// Stores a single metric in shm. The metric name must be a valid filename
-// (must not contain slashes and must fit within the OS limit for filename
-// length). TTL is the number of seconds for which this metric is valid,
-// where 0 means infinity
-// Returns 0 on success. On error, returns -1 and sets errno accordingly
-int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl);
-
-int fty_shm_write_metric_proto(fty_proto_t* metric);
-
-// Retrieve a metric from shm. Caller must free the returned values.
-// Returns 0 on success. On error, returns -1 and sets errno accordingly
-// @param asset : asset name 
-// @param metric : metric name
-// @param value : parameter to be write the value output
-// @param unit : parameter to be write the unit output
-// @return : 1 on succes, -1 if asset doesn't exist  
-int fty_shm_read_metric(const char* asset, const char* metric, char** value, char** unit);
-
-// Use a custom storage directory for test purposes (the passed string must
-// not be freed)
-// should be called only on unit test 
-// sets the current folder path to test directory 
-// returns 0 on succes 
-// returns -1 if input string size is longer than max allowed(PATH_MAX - strlen("/") - NAME_MAX)
-int fty_shm_set_test_dir(const char* dir);
-// Clean the custom storage directory
-// @return : 0 on succes, for non-zero error codes listed in rmdir() document 
-int fty_shm_delete_test_dir();
-
-#ifdef __cplusplus
-}
-
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#define FTY_SHM_METRIC_TYPE "0"
+
+// returns pooling interval in second (>=0)
+// @return : current polling interval
+int fty_get_polling_interval();
+
+// set the polling interval (seconds)
+// @param val : value of polling interval (>=0)
+// Returns void
+void fty_shm_set_default_polling_interval(int val);
+
+// Stores a single metric in shared memory. The asset & metric name must be a valid filename
+// (must not contain slashes and must fit within the OS limit for filename
+// length). TTL is the number of seconds for which this metric is valid, where 0 means infinity
+// @param asset : asset name (non NULL/empty)
+// @param metric : metric name (non NULL/empty)
+// @param value : value (non NULL/empty)
+// @param unit : unit (non NULL)
+// @param ttl : time to live (>=0)
+// Returns 0 on success, else -1 (sets errno accordingly)
+int fty_shm_write_metric(const char* asset, const char* metric, const char* value, const char* unit, int ttl);
+
+// Stores a single metric in shared memory, using the fty_proto_t model.
+// Same specifciations as fty_shm_write_metric()
+// @param proto : fty_proto_t object (non NULL)
+// Returns 0 on success, else -1 (sets errno accordingly)
+int fty_shm_write_metric_proto(fty_proto_t* metric);
+
+// Retrieve a metric from shared memory.
+// Caller must free the returned values (value, unit).
+// @param asset : asset name
+// @param metric : metric name
+// @param-out value : parameter to be write the value output (set to NULL if error)
+// @param-out unit : parameter to be write the unit output (set to NULL if error)
+// Returns : 0 on success, -1 if metric/asset doesn't exist
+int fty_shm_read_metric(const char* asset, const char* metric, char** value, char** unit);
+
+// Only UT or Debug
+// Use a custom storage directory for test purposes.
+// Should be called only on unit test.
+// Sets the current directory path
+// @param dir : the dirctory (non NULL, valid)
+// Returns 0 on success, -1 if input is invalid
+int fty_shm_set_test_dir(const char* dir);
+
+// Cleanup (delete metrics and sub directories) the custom storage directory
+// Returns 0 on success, else <0 (for non-zero error codes listed in rmdir() document)
+int fty_shm_delete_test_dir();
 
 namespace fty::shm {
 
@@ -82,26 +82,24 @@ class shmMetrics
 public:
     ~shmMetrics();
 
-    // @param index : index of the m_metricsVector
+    // Get metric at index
+    // @param index : index of the metric of the cached metrics
     // @return : the object of the indexed element
-    //           caller must not delete the returned object
-    //           deallocation handled in shmMetrics dtor
-    fty_proto_t*      get(int index);
+    // Caller **must not** delete the returned object
+    fty_proto_t* get(int index);
 
-    // duplicates the index element
-    // @param index : index of the m_metricsVector
-    // @return : duplicated element, caller must
-    //           delete the returned object
-    fty_proto_t*      getDup(int index);
+    // Get metric at index (duplicate)
+    // @param index : index of the metric of the cached metrics
+    // @return : the duplicated object of the indexed element
+    // Caller **must** delete the returned object
+    fty_proto_t* getDup(int index);
 
-    // pushes back the input fty_proto_t pointer
-    // @param metric : member will be pushed back to the vector
-    //                 objects added to the vector will be
-    //                 deleted by the shmMetrics dtor, caller
-    //                 must leave witohut destroy
-    void              add(fty_proto_t* metric);
+    // Pushes back the fty_proto_t object in the cached metrics
+    // @param metric : the object
+    // Caller **must not** delete the object (owned by the cache)
+    void add(fty_proto_t* metric);
 
-    // returns size of the vector
+    // returns the size of the cached metrics
     long unsigned int size();
 
     typedef typename std::vector<fty_proto_t*>   vector_type;
@@ -129,36 +127,37 @@ private:
     std::vector<fty_proto_t*> m_metricsVector;
 };
 
-// C++ versions of fty_shm_write_metric_proto()
-// @param metric : metric data will be written to file
-// @return : 0 on succes, -1 if file cannot be created
+// Write a metric in the shared memory
+// @param metric : metric object (non NULL)
+// Return : 0 on success, else -1
 int write_metric(fty_proto_t* metric);
 
+// Write a metric in the shared memory
 // @param asset : asset name
 // @param metric : metric name
 // @param value : metric value
-// @param unit : metric unit
-// @param ttl : data sotrage duration 
-// @return : 0 on succes, -1 if file name is incompatible
-int write_metric(
-    const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
+// @param unit : metric unit (can be empty)
+// @param ttl : data sotrage duration (seconds)
+// Return : 0 on success, else -1
+int write_metric(const std::string& asset, const std::string& metric, const std::string& value, const std::string& unit, int ttl);
 
-// C++ version of fty_shm_read_metric()
-// reads the metric according to asset name and type and returns the value 
+// Reads the metric according to asset name and metric type. Set value on return.
 // @param asset : asset name
 // @param metric : metric type
-// @param value : output value
-// @return : 0 on succes, -1 if metric doesn't exist or cannot be opened
+// @param-out value : the value
+// Return : 0 on success, else -1
 int read_metric_value(const std::string& asset, const std::string& metric, std::string& value);
 
-// if return = 0 : create a fty_proto which correspond to the metric. Must be
-// free by the caller.
+// Reads the metric according to asset name and metric type. Set fty_proto_t object on return on return.
+// @param asset : asset name
+// @param metric : metric type
+// @param-out proto_metric : the fty_proto_t object
+// Return : 0 on success (set proto_metric), else -1
+// Caller **must** delete the returned object
 int read_metric(const std::string& asset, const std::string& metric, fty_proto_t** proto_metric);
 
-// on success : fill result with the metrics still valid who matches the asset
-// and metric filters.
+// Reads all the metrics matching to asset name and metric type. Set result on return.
+// Return : 0 on success (set result), else -1
 int read_metrics(const std::string& asset, const std::string& metric, shmMetrics& result);
 
 } // namespace fty::shm
-
-#endif // __cplusplus
