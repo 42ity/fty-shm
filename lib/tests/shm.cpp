@@ -10,9 +10,6 @@ TEST_CASE("read-write test")
     std::string  value;
     fty_proto_t *proto_metric = nullptr;
 
-
-printf("XXXX\n");
-
     // adjust test directory
     REQUIRE(fty_shm_set_test_dir(SELFTEST_RW) == 0);
 
@@ -26,8 +23,6 @@ printf("XXXX\n");
 
     longAssetName[PATH_MAX - 1] = '\0';
 
-printf("AAA\n");
-
     // write_metric returns fail
     REQUIRE(fty::shm::write_metric(longAssetName, "metric", "here_is_my_value", "unit?", 2) < 0);
 
@@ -35,34 +30,18 @@ printf("AAA\n");
     const char * invalidAssetName1 = "te/st";
     const char * invalidAssetName2 = "te@st";
 
-
-printf("999999\n");
-
     // write_metric returns fail
     REQUIRE(fty::shm::write_metric(invalidAssetName1, "metric", "here_is_my_value", "unit?", 2) < 0);
     REQUIRE(fty::shm::write_metric(invalidAssetName2, "metric", "here_is_my_value", "unit?", 2) < 0);
 
-
-printf("8888\n");
-
     // pass invalid parameters to write_metric(returns fail)
     REQUIRE(fty::shm::write_metric("", "", "", "", -1) < 0);
-
-printf("xx\n");
     REQUIRE(fty::shm::write_metric("asset", "metric", "", "unit?", -1) < 0);
-
-printf("yy\n");
     REQUIRE(fty::shm::write_metric("asset", "", "here_is_my_value", "unit?", -1) < 0);
-
-printf("zz\n");
     REQUIRE(fty::shm::write_metric("", "metric", "here_is_my_value", "unit?", -1) < 0);
 
-
-printf("ttt\n");
     // pass null to write_metric(returns fail)
     REQUIRE(fty::shm::write_metric(nullptr) < 0);
-
-printf("BBB\n");
 
     // pass negative ttl value to write_metric
     // neg. values accepted as zero
@@ -77,8 +56,6 @@ printf("BBB\n");
     // write metrics with ordinary allowed parameters
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "", 2) == 0);
     REQUIRE(fty::shm::write_metric("asset", "metric", "here_is_my_value", "unit?", 2) == 0);
-
-printf("CCCC\n");
 
     // read values with the same parameters
     // succesful and equals to written values
