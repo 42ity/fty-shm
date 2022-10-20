@@ -119,7 +119,6 @@ void Benchmark::timestamp(const std::string& message)
     tv_last = tv;
 }
 
-
 void Benchmark::c_api_bench()
 {
     int    i;
@@ -184,7 +183,7 @@ void Benchmark::cpp_api_bench()
         snprintf(buf, sizeof(buf), VALUE_FMT, i);
         values.push_back(buf);
     }
-    while(1);
+
     timestamp("setup");
     if (do_write) {
         for (i = 0; i < NUM_METRICS; i++)

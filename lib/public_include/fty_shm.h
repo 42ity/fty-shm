@@ -50,7 +50,7 @@ int fty_shm_write_metric(const char* asset, const char* metric, const char* valu
 
 // Stores a single metric in shared memory, using the fty_proto_t model.
 // Same specifciations as fty_shm_write_metric()
-// @param proto : fty_proto_t object (non NULL)
+// @param metric : fty_proto_t object (non NULL)
 // Returns 0 on success, else -1 (sets errno accordingly)
 int fty_shm_write_metric_proto(fty_proto_t* metric);
 
