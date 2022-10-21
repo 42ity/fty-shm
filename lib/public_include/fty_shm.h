@@ -67,7 +67,7 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
 // Use a custom storage directory for test purposes.
 // Should be called only on unit test.
 // Sets the current directory path
-// @param dir : the dirctory (non NULL, valid)
+// @param dir : the directory (non NULL, valid)
 // Returns 0 on success, -1 if input is invalid
 int fty_shm_set_test_dir(const char* dir);
 
