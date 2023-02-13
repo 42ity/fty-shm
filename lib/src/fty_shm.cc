@@ -540,12 +540,14 @@ int fty::shm::read_metrics(const std::string& asset, const std::string& type, sh
         if (!dir) {
             return -1;
         }
-        dirfd(dir);
+        dirfd(dir); // helpful?!
 
         struct dirent* de_root;
         while ((de_root = readdir(dir))) {
             fty_shm_read_family(de_root->d_name, asset, type, result);
         }
+
+        closedir(dir);
     }
     else {
         fty_shm_read_family(family.c_str(), asset, type, result);
