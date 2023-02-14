@@ -156,11 +156,11 @@ void Benchmark::c_api_bench()
         {
             if(getline(Inames, name, ' '))
             {
-                char* res_value;
-                char* res_unit;
+                char* res_value = NULL;
+                char* res_unit = NULL;
                 fty_shm_read_metric("bench_asset", name.c_str(), &res_value, &res_unit);
-                zstr_free(&res_value);
-                zstr_free(&res_unit);
+                if (res_value) free(res_value);
+                if (res_unit) free(res_unit);
             }
         }
 
