@@ -20,7 +20,7 @@
 Source:         fty-shm
 Section:        net
 Priority:       optional
-Maintainer:     fty-shm Developers <eatonipcopensource@eaton.com>
+Maintainer:     fty-shm Developers <opensource@eaton.com>
 Standards-Version: 4.0.1.0
 Build-Depends: debhelper (>= 9),
     cmake (>=3.0),
