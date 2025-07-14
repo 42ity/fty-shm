@@ -59,7 +59,7 @@ namespace fty::shm
        // build metric json payload
         std::string json;
         int r = metric2JSON(metric, json);
-        if (r != 0) return -1;
+        if (r != 0) { return -1; }
 
         // publish on metric topic
         // see https://confluence-prod.tcc.etn.com/display/BiosWiki/MQTT+on+IPM2
@@ -122,7 +122,8 @@ namespace fty::shm
     }
 }
 
-// proto metric json serializer (no cxxtools usage)
+// proto metric json serializer (no cxxtools usage to be faster)
+// Notice: metric aux attributes are not handled
 // returns 0 if success, else <0
 static int metric2JSON(fty_proto_t* metric, std::string& json)
 {
@@ -143,7 +144,7 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
         std::string metricName{std::string(type_ ? type_ : "null") + "@" + std::string(name_ ? name_ : "null")};
         std::string value{value_ ? value_ : ""};
         std::string unit{unit_ ? unit_ : ""};
-        if (unit == " ") unit = ""; // emptied if single space
+        if (unit == " ") { unit = ""; } // emptied if single space
 
         time_t timestamp = std::time(nullptr); // epoch time (now)
 
@@ -158,13 +159,13 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
             << "}";
 
         json = oss.str();
+        return 0;
     }
     catch (const std::exception& e) {
         logError("metric json serialization failed (e: '{}')", e.what());
-        return -1;
     }
 
-    return 0;
+    return -1;
 }
 
 

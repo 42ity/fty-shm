@@ -51,12 +51,12 @@ static const char help_text[] =
     "benchmark [options] ...\n"
     "  -d, --directory=DIR   set a custom storage directory for testing\n"
     "  -c, --clean           clean and delete the custom storage directory (work only if -d)\n"
-    "  -r, --write           only benchmark writes\n"
+    "  -w, --write           only benchmark writes\n"
     "  -r, --read            only benchmark reads\n"
     "  -b, --benchmark=NAME  select benchmark to run (use -b help for a list)\n"
     "  -h, --help            display this help text and exit\n";
 
-#define NUM_METRICS 10000
+#define NUM_METRICS 50000
 
 #define METRIC_LEN 10
 #define METRIC_FMT "m%08d"
@@ -225,9 +225,14 @@ int main(int argc, char** argv)
     Benchmark::benchmark_fn func   = &Benchmark::cpp_api_bench;
     bool                    bclean = false;
 
-    static struct option long_opts[] = {{"help", no_argument, 0, 'h'}, {"directory", required_argument, 0, 'd'},
-        {"clean", no_argument, 0, 'c'}, {"write", no_argument, 0, 'w'}, {"read", no_argument, 0, 'r'},
-        {"benchmark", required_argument, 0, 'b'}};
+    static struct option long_opts[] = {
+        {"help", no_argument, 0, 'h'},
+        {"directory", required_argument, 0, 'd'},
+        {"clean", no_argument, 0, 'c'},
+        {"write", no_argument, 0, 'w'},
+        {"read", no_argument, 0, 'r'},
+        {"benchmark", required_argument, 0, 'b'}
+    };
 
     int c = 0;
     while (c >= 0) {
