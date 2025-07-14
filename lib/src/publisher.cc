@@ -23,12 +23,6 @@
 #include <fty_proto.h>
 #include <fty_log.h>
 
-//#define _METRIC2JSON_USE_CXXTOOLS_
-#undef _METRIC2JSON_USE_CXXTOOLS_
-#ifdef _METRIC2JSON_USE_CXXTOOLS_
-#include <cxxtools/jsonserializer.h>
-#endif
-
 #include <fty/messagebus2/MessageBus.h>
 #include <fty/messagebus2/Message.h>
 #include <fty/messagebus2/mqtt/MessageBusMqtt.h>
@@ -54,7 +48,8 @@ namespace fty::shm
                 logError("Error while connecting to mqtt bus {}", fty::messagebus2::to_string(connectionRet.error()));
                 msgBus = nullptr;
             }
-        } else {
+        }
+        else {
             logError("Error while creating mqtt client");
         }
     }
@@ -85,7 +80,8 @@ namespace fty::shm
                 logError("Error while sending {}", fty::messagebus2::to_string(sendRet.error()));
                 return -2;
             }
-        } else {
+        }
+        else {
             //logWarn("Mqtt is not connected");
         }
 
@@ -126,7 +122,7 @@ namespace fty::shm
     }
 }
 
-// proto metric json serializer
+// proto metric json serializer (no cxxtools usage)
 // returns 0 if success, else <0
 static int metric2JSON(fty_proto_t* metric, std::string& json)
 {
@@ -151,19 +147,6 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
 
         time_t timestamp = std::time(nullptr); // epoch time (now)
 
-#ifdef _METRIC2JSON_USE_CXXTOOLS_
-        //WARNING: cxxtools json serializer seems to produce memleaks
-        #pragma message "=== _METRIC2JSON_USE_CXXTOOLS_ defined ==="
-
-        cxxtools::SerializationInfo si;
-        si.addMember("metric") <<= metricName;
-        si.addMember("value") <<= value;
-        si.addMember("unit") <<= unit;
-        si.addMember("ttl") <<= ttl_; // numeric
-        si.addMember("timestamp") <<= std::to_string(timestamp);
-
-        json = JSON::writeToString(si, false/*beautify*/);
-#else
         // inlined json (without beautifyer)
         std::ostringstream oss;
         oss << "{"
@@ -175,11 +158,6 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
             << "}";
 
         json = oss.str();
-#endif //_METRIC2JSON_USE_CXXTOOLS_
-
-        if (json.empty()) {
-            throw std::runtime_error("json payload is empty");
-        }
     }
     catch (const std::exception& e) {
         logError("metric json serialization failed (e: '{}')", e.what());

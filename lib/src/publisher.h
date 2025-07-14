@@ -16,6 +16,7 @@
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
     =========================================================================
 */
+
 #pragma once
 
 #include <fty_proto.h>
@@ -24,7 +25,7 @@
 
 namespace fty::messagebus2
 {
-        class MessageBus;
+    class MessageBus;
 }
 
 namespace fty::shm
