@@ -28,24 +28,30 @@
 #include <sys/stat.h>
 #include <fty_log.h>
 
+#ifndef streq
+#define streq(a, b) (strcmp(a, b) == 0)
+#endif
+
 #define TTL_LEN 11
 
-static int parse_ttl(char* ttl_str, time_t& ttl)
+// returns 0 if success (ttl is set), else <0
+static int parse_ttl(char* str, time_t& ttl)
 {
-    // Delete the '\n'
-    int len = int(strlen(ttl_str) -1);
-    if (ttl_str[len] == '\n') {
-        ttl_str[len] = '\0';
+    if (!(str && (*str))) {
+        return -1;
     }
 
+    // Ends str at the latest '\n'
+    char* p = strrchr(str, '\n');
+    if (p) { *p = 0; }
+
     char *err = NULL;
-    int res = int(strtol(ttl_str, &err, 10));
-    if (err != ttl_str + TTL_LEN - 1) {
+    ttl = int(strtol(str, &err, 10));
+    if (err != str + TTL_LEN - 1) {
         errno = ERANGE;
         return -1;
     }
 
-    ttl = res;
     return 0;
 }
 
@@ -53,7 +59,7 @@ static int parse_ttl(char* ttl_str, time_t& ttl)
 // -1 : invalid file or metric/data
 //  0 : outdated data (file removed)
 //  1 : up to date data
-static int clean_outdated_data(std::string filename)
+static int clean_outdated_data(const std::string& filename)
 {
     FILE* file = fopen(filename.c_str(), "r");
     if (!file) {
@@ -62,26 +68,26 @@ static int clean_outdated_data(std::string filename)
     }
 
     struct stat st;
-    if(fstat(fileno(file), &st) < 0) {
+    if (fstat(fileno(file), &st) != 0) {
         fclose(file);
         log_error("stat %s failed (%s)", filename.c_str(), strerror(errno));
         return -1; // invalid file
     }
 
-    // read file in buf
+    // read file in buf (first line)
     char buf[128] = "";
     fgets(buf, sizeof(buf), file);
     fclose(file);
     file = nullptr;
 
-  //get ttl
-  time_t ttl = -1;
-  if (parse_ttl(buf, ttl) < 0) {
-    return -1;
-  }
+    // get ttl
+    time_t ttl = -1;
+    if (parse_ttl(buf, ttl) != 0) {
+        return -1;
+    }
 
-  //data still valid ?
-  if (ttl >= 0) {
+    // data still valid ?
+    if (ttl >= 0) {
         time_t now = time(nullptr);
         if ((now - st.st_mtime) > ttl) {
             errno = ESTALE;
@@ -92,34 +98,37 @@ static int clean_outdated_data(std::string filename)
             return 0; // removed
         }
     }
+
     return 1; // up to date
 }
 
 // cleanup outdated metrics from PATH
 // returns 0 if success, else <0
-static int fty_shm_cleanup(const std::string& directory_path, size_t &removedFilesCnt, bool verbose)
+static int fty_shm_cleanup(const std::string& dirpath, size_t &removedFilesCnt, bool verbose)
 {
     if (verbose) {
-        log_info("shm cleanup directory '%s'", directory_path.c_str());
+        std::cout << "shm cleanup directory '" << dirpath << "'\n";
     }
 
-    DIR *dir = opendir(directory_path.c_str());
-    if (dir == nullptr) {
-        log_error("opendir %s failed (%s)", directory_path.c_str(), strerror(errno));
+    DIR* dir = opendir(dirpath.c_str());
+    if (!dir) {
+        log_error("opendir %s failed (%s)", dirpath.c_str(), strerror(errno));
         return -1;
     }
 
-    struct dirent *ent;
-    while ((ent = readdir(dir)) != nullptr) {
-        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0)
+    struct dirent* ent;
+    while ((ent = readdir(dir))) {
+        if (streq(ent->d_name, ".") || streq(ent->d_name, "..")) {
             continue;
-        std::string filename(directory_path);
-        filename.append("/").append(ent->d_name);
+        }
+
+        const std::string filename(dirpath + "/" + ent->d_name);
         if (ent->d_type == DT_DIR) { // recursive
             fty_shm_cleanup(filename, removedFilesCnt, verbose);
         }
         else {
-            if (clean_outdated_data(filename) == 0) {
+            int r = clean_outdated_data(filename);
+            if (r == 0) {
                 removedFilesCnt++;
             }
         }
@@ -129,46 +138,46 @@ static int fty_shm_cleanup(const std::string& directory_path, size_t &removedFil
     return 0;
 }
 
+static const char help_text[] =
+    "fty-shm-cleanup [options] ...\n"
+    "  -v  verbose output\n"
+    "  -h  display this help text and exit\n";
+
 int main(int argc, char* argv[])
 {
-    const char* agent_name = "fty-shm-cleanup";
-    const std::string path{"/run/42shm"};
     bool verbose = false;
 
     // handle args
-    {
-        static const char help_text[]
-            = "fty-shm-cleanup [options] ...\n"
-              "  -v    verbose output\n"
-              "  -h    display this help text and exit\n";
-
-        int argn;
-        for (argn = 1; argn < argc; argn++) {
-            const char* arg = argv[argn];
-            if (strcmp(arg, "-v") == 0) {
-                verbose = true;
-            }
-            else if (strcmp(arg, "-h") == 0) {
-                std::cout << help_text;
-                return EXIT_SUCCESS;
-            }
-            else {
-                std::cerr << help_text;
-                std::cerr << "unknown argument '" << std::string(arg) << "'" << std::endl;
-                return EXIT_FAILURE;
-            }
+    for (int i = 1; i < argc; i++) {
+        const char* arg = argv[i];
+        if (streq(arg, "-v")) {
+            verbose = true;
+        }
+        else if (streq(arg, "-h")) {
+            std::cout << help_text;
+            return EXIT_SUCCESS;
+        }
+        else {
+            std::cerr << help_text;
+            std::cerr << "Unknown argument '" << std::string(arg) << "'" << std::endl;
+            return EXIT_FAILURE;
         }
     }
 
-    ftylog_setInstance(agent_name, "");
-    log_info("%s:\tStarted...", agent_name);
+    const std::string agentName = "fty-shm-cleanup";
+    const std::string path{"/run/42shm"};
 
-    size_t removedFilesCnt = 0;
-    int r = fty_shm_cleanup(path, removedFilesCnt, verbose);
+    ftylog_setInstance(agentName.c_str(), "");
+
+    std::cout << agentName << " started...\n";
+
+    size_t rmCnt = 0;
+    int r = fty_shm_cleanup(path, rmCnt, verbose);
     if (r != 0) {
-        log_error("%s:\tFailed (r: %d, %zu metric(s) removed)", agent_name, r, removedFilesCnt);
+        std::cerr << agentName << " failed (r: " << r << ", " << rmCnt << " metric(s) removed)\n";
         return EXIT_FAILURE;
     }
-    log_info("%s:\tEnded (%zu metric(s) removed)", agent_name, removedFilesCnt);
+
+    std::cout << agentName << " ended (" << rmCnt << " metric(s) removed)\n";
     return EXIT_SUCCESS;
 }
