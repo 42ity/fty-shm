@@ -279,6 +279,7 @@ int main(int argc, char** argv)
         }
     }
 
+    std::cout << "#metrics: " << std::to_string(NUM_METRICS) << std::endl;
     (benchmark.*func)();
     if (bclean)
         fty_shm_delete_test_dir();

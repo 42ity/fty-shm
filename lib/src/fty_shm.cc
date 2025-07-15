@@ -126,7 +126,7 @@ int fty_shm_write_metric(const char* asset, const char* metric, const char* valu
 }
 
 // read metric from filename & set proto_metric
-// returns 0 on success, else <0
+// Returns 0 if success, else <0
 static int read_data_metric(const char* filename, fty_proto_t* proto_metric)
 {
     if (!(filename && proto_metric)) {
@@ -186,7 +186,7 @@ static int read_data_metric(const char* filename, fty_proto_t* proto_metric)
         fty_proto_set_ttl(proto_metric, uint32_t(ttl));
     }
 
-    // set timestamp (file creation date)
+    // set timestamp (file modification date)
     fty_proto_set_time(proto_metric, uint64_t(st.st_mtim.tv_sec));
 
     // get unit
@@ -197,8 +197,8 @@ static int read_data_metric(const char* filename, fty_proto_t* proto_metric)
         }
         END_CR(buf);
 
-        // set unit
-        fty_proto_set_unit(proto_metric, "%s", buf); // unit can be "%" (ex.: load.default@ups-xxx)
+        // set unit (can be "%", as for: load.default@ups-xxx)
+        fty_proto_set_unit(proto_metric, "%s", buf);
     }
 
     // get value
@@ -217,8 +217,8 @@ static int read_data_metric(const char* filename, fty_proto_t* proto_metric)
     {
         char buf2[128];
         buf[0] = buf2[0] = 0;
-        while (fgets(buf, sizeof(buf), file) // key
-               && fgets(buf2, sizeof(buf2), file) // value
+        while (fgets(buf, sizeof(buf), file) // key line
+               && fgets(buf2, sizeof(buf2), file) // value line
         ) {
             END_CR(buf);
             END_CR(buf2);
@@ -253,70 +253,71 @@ int fty_shm_read_metric(const char* asset, const char* metric, char** value, cha
         return -1;
     }
 
-    fty_proto_t* proto_metric = fty_proto_new(FTY_PROTO_METRIC);
+    fty_proto_t* proto = fty_proto_new(FTY_PROTO_METRIC);
 
-    r = read_data_metric(filename, proto_metric);
+    r = read_data_metric(filename, proto);
     if (r == 0) { // ok
         if (value) {
-            *value = strdup(fty_proto_value(proto_metric));
+            *value = strdup(fty_proto_value(proto));
         }
         if (unit) {
-            *unit = strdup(fty_proto_unit(proto_metric));
+            *unit = strdup(fty_proto_unit(proto));
         }
     }
 
-    fty_proto_destroy(&proto_metric);
+    fty_proto_destroy(&proto);
 
-    return r;
+    return (r == 0) ? 0 : -1;
 }
 
+// Returns 0 if success, else <0
 static int fty_shm_read_family (const char* family, std::string asset, std::string type, fty::shm::shmMetrics& result)
 {
-    std::string family_dir = g_shm_dir;
+    int ret{-1}; // default (error)
+
+    std::string family_dir{g_shm_dir ? g_shm_dir : ""};
     family_dir.append("/").append(family);
 
     DIR* dir = opendir(family_dir.c_str());
-    if (!dir) {
-        return -1;
-    }
+    if (dir) {
+        try {
+            std::regex regType(type);
+            std::regex regAsset(asset);
 
-    try {
-        std::regex regType(type);
-        std::regex regAsset(asset);
-
-        struct dirent* de;
-        while ((de = readdir(dir))) {
-            const char* delim = strchr(de->d_name, SEPARATOR);
-            if (!delim) {
-                continue; // not a valid metric
-            }
-
-            size_t type_name = size_t(delim - de->d_name);
-            if (std::regex_match(std::string(delim + 1), regAsset)
-                && std::regex_match(std::string(de->d_name, type_name), regType)
-            ) {
-                fty_proto_t* proto_metric = fty_proto_new(FTY_PROTO_METRIC);
-                std::string  filename(family_dir);
-                filename.append("/").append(de->d_name);
-                if (read_data_metric(filename.c_str(), proto_metric) == 0) {
-                    fty_proto_set_name(proto_metric, "%s", std::string(delim + 1).c_str());
-                    fty_proto_set_type(proto_metric, "%s", std::string(de->d_name, type_name).c_str());
-                    result.add(proto_metric);
+            struct dirent* de;
+            while ((de = readdir(dir))) {
+                const char* delim = strchr(de->d_name, SEPARATOR);
+                if (!delim) {
+                    continue; // not a valid metric
                 }
-                else {
-                    fty_proto_destroy(&proto_metric);
+
+                size_t type_name = size_t(delim - de->d_name);
+                if (std::regex_match(std::string(delim + 1), regAsset)
+                    && std::regex_match(std::string(de->d_name, type_name), regType)
+                ) {
+                    fty_proto_t* proto_metric = fty_proto_new(FTY_PROTO_METRIC);
+                    std::string  filename(family_dir);
+                    filename.append("/").append(de->d_name);
+                    if (read_data_metric(filename.c_str(), proto_metric) == 0) {
+                        fty_proto_set_name(proto_metric, "%s", std::string(delim + 1).c_str());
+                        fty_proto_set_type(proto_metric, "%s", std::string(de->d_name, type_name).c_str());
+                        result.add(proto_metric);
+                    }
+                    else {
+                        fty_proto_destroy(&proto_metric);
+                    }
                 }
             }
+
+            ret = 0; // ok
+        }
+        catch (...) { // regex exceptions
         }
 
         closedir(dir);
-        return 0;
-    }
-    catch (...) {
     }
 
-    closedir(dir);
-    return -1;
+    return ret;
 }
 
 // should be called onl on unit test
@@ -355,11 +356,11 @@ int fty_shm_delete_test_dir()
     remove(metric_dir.c_str());
 
     int r = remove(g_shm_dir);
-    return r;
+    return (r == 0) ? 0 : -1;
 }
 
 // ensure on return that the giver directory exist
-// Returns 0 if ok, else <-1
+// Returns 0 if success, else <0
 int fty_shm_set_test_dir(const char* dirname)
 {
     if (!dirname) {
@@ -370,7 +371,7 @@ int fty_shm_set_test_dir(const char* dirname)
     if (!dir) {
         int r = mkdir(dirname, 0777);
         if (r != 0) {
-            return r;
+            return -1;
         }
     }
     else {
@@ -383,7 +384,7 @@ int fty_shm_set_test_dir(const char* dirname)
     if (!dir) {
         int r = mkdir(subdir.c_str(), 0777);
         if (r != 0) {
-            return r;
+            return -1;
         }
     }
     else {
@@ -397,7 +398,8 @@ int fty_shm_set_test_dir(const char* dirname)
     return 0;
 }
 
-// Write ttl and value to filename
+// Write metric filename
+// Returns 0 if success, else <0
 static int write_metric_data(fty_proto_t* metric)
 {
     if (!metric) {
@@ -522,7 +524,7 @@ int fty::shm::read_metric(const std::string& asset, const std::string& metric, f
         fty_proto_destroy(&proto);
     }
 
-    return r;
+    return (r == 0) ? 0 : -1;
 }
 
 int fty::shm::read_metrics(const std::string& asset, const std::string& type, shmMetrics& result)
