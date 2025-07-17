@@ -21,7 +21,6 @@
 
 #include "fty_shm.h"
 #include "publisher.h"
-#include <assert.h>
 #include <regex>
 #include <cstring>
 
@@ -90,7 +89,6 @@ static int build_metric_filename(char* buf, size_t bufSize, const char* asset, c
     size_t metricLen = strlen(metric);
 
     if ((metricLen + SEPARATOR_LEN + assetLen) > NAME_MAX) {
-        errno = ENAMETOOLONG;
         return -1;
     }
 
@@ -99,7 +97,6 @@ static int build_metric_filename(char* buf, size_t bufSize, const char* asset, c
         || memchr(metric, '/', metricLen)
         || memchr(metric, SEPARATOR, metricLen)
     ) {
-        errno = EINVAL;
         return -1;
     }
 
@@ -169,7 +166,6 @@ static int read_data_metric(const char* filename, fty_proto_t* proto)
         char* err = NULL;
         int ttl = int(strtol(buf, &err, 10));
         if (err != buf + TTL_LEN - 1) {
-            errno = ERANGE;
             RET_ERROR; // bad size
         }
 
@@ -177,7 +173,6 @@ static int read_data_metric(const char* filename, fty_proto_t* proto)
         if (ttl != 0) {
             time_t now = time(nullptr);
             if ((now - st.st_mtime) > ttl) {
-                errno = ESTALE;
                 fclose(file);
                 file = NULL;
                 const char* env = getenv(AUTOCLEAN_ENV);
