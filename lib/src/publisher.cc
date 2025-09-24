@@ -23,12 +23,6 @@
 #include <fty_proto.h>
 #include <fty_log.h>
 
-//#define _METRIC2JSON_USE_CXXTOOLS_
-#undef _METRIC2JSON_USE_CXXTOOLS_
-#ifdef _METRIC2JSON_USE_CXXTOOLS_
-#include <cxxtools/jsonserializer.h>
-#endif
-
 #include <fty/messagebus2/MessageBus.h>
 #include <fty/messagebus2/Message.h>
 #include <fty/messagebus2/mqtt/MessageBusMqtt.h>
@@ -54,7 +48,8 @@ namespace fty::shm
                 logError("Error while connecting to mqtt bus {}", fty::messagebus2::to_string(connectionRet.error()));
                 msgBus = nullptr;
             }
-        } else {
+        }
+        else {
             logError("Error while creating mqtt client");
         }
     }
@@ -64,7 +59,7 @@ namespace fty::shm
        // build metric json payload
         std::string json;
         int r = metric2JSON(metric, json);
-        if (r != 0) return -1;
+        if (r != 0) { return -1; }
 
         // publish on metric topic
         // see https://confluence-prod.tcc.etn.com/display/BiosWiki/MQTT+on+IPM2
@@ -85,7 +80,8 @@ namespace fty::shm
                 logError("Error while sending {}", fty::messagebus2::to_string(sendRet.error()));
                 return -2;
             }
-        } else {
+        }
+        else {
             //logWarn("Mqtt is not connected");
         }
 
@@ -126,7 +122,8 @@ namespace fty::shm
     }
 }
 
-// proto metric json serializer
+// proto metric json serializer (no cxxtools usage to be faster)
+// Notice: metric aux attributes are not handled
 // returns 0 if success, else <0
 static int metric2JSON(fty_proto_t* metric, std::string& json)
 {
@@ -147,23 +144,10 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
         std::string metricName{std::string(type_ ? type_ : "null") + "@" + std::string(name_ ? name_ : "null")};
         std::string value{value_ ? value_ : ""};
         std::string unit{unit_ ? unit_ : ""};
-        if (unit == " ") unit = ""; // emptied if single space
+        if (unit == " ") { unit = ""; } // emptied if single space
 
         time_t timestamp = std::time(nullptr); // epoch time (now)
 
-#ifdef _METRIC2JSON_USE_CXXTOOLS_
-        //WARNING: cxxtools json serializer seems to produce memleaks
-        #pragma message "=== _METRIC2JSON_USE_CXXTOOLS_ defined ==="
-
-        cxxtools::SerializationInfo si;
-        si.addMember("metric") <<= metricName;
-        si.addMember("value") <<= value;
-        si.addMember("unit") <<= unit;
-        si.addMember("ttl") <<= ttl_; // numeric
-        si.addMember("timestamp") <<= std::to_string(timestamp);
-
-        json = JSON::writeToString(si, false/*beautify*/);
-#else
         // inlined json (without beautifyer)
         std::ostringstream oss;
         oss << "{"
@@ -175,18 +159,13 @@ static int metric2JSON(fty_proto_t* metric, std::string& json)
             << "}";
 
         json = oss.str();
-#endif //_METRIC2JSON_USE_CXXTOOLS_
-
-        if (json.empty()) {
-            throw std::runtime_error("json payload is empty");
-        }
+        return 0;
     }
     catch (const std::exception& e) {
         logError("metric json serialization failed (e: '{}')", e.what());
-        return -1;
     }
 
-    return 0;
+    return -1;
 }
 
 

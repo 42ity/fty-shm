@@ -28,11 +28,9 @@ Build-Depends: debhelper (>= 9),
     libczmq-dev (>= 3.0.2),
     libfty-utils-dev,
     libfty-proto-dev,
-    libcxxtools-dev,
     libfty-common-dev,
     libfty-common-logging-dev,
-    libfty-messagebus2-dev,
-    dh-autoreconf
+    libfty-messagebus2-dev
 
 Package: libfty-shm0
 Architecture: any
