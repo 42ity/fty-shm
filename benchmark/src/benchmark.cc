@@ -28,7 +28,6 @@
 
 #include "fty_shm.h"
 #include <algorithm>
-#include <assert.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
