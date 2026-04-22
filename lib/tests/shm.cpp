@@ -80,7 +80,7 @@ TEST_CASE("read-write test")
     // read values with the same parameters
     // succesful and equals to written values
     REQUIRE(fty::shm::read_metric_value("asset", "metric", value) == 0);
-    assert(value == "here_is_my_value");
+    REQUIRE(value == "here_is_my_value");
     REQUIRE(fty::shm::read_metric("asset", "metric", &proto_metric) == 0);
     REQUIRE(proto_metric != nullptr);
 
